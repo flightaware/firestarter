@@ -1,0 +1,3 @@
+sqlalchemy
+# optional, if postgres support is desired
+psycopg2-binary

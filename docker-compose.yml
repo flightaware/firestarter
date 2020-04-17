@@ -1,0 +1,98 @@
+version: '3.7'
+
+services:
+  connector:
+    image: "firestarter_connector:1.0"
+    build: ./connector
+    init: true
+    networks:
+      - internal
+    ports:
+      # Provides optional access to the raw Firehose stream for consumption
+      # by non-dockerized applications
+      - "${STREAMING_PORT:-127.0.0.1:1601}:1601"
+    environment:
+      # Firehose account username
+      - FH_USERNAME=${FH_USERNAME:?FH_USERNAME variable must be set}
+      # Firehose account key
+      - FH_APIKEY=${FH_APIKEY:?FH_APIKEY variable must be set}
+      # Firehose URL, firehose.flightaware.com can also be used
+      - SERVER=${SERVER:-firehose-test.flightaware.com}
+      # Streaming compression of incoming Firehose data. Valid values are gzip,
+      # deflate, or compress. Leave blank to disable compression.
+      - COMPRESSION=${COMPRESSION:-}
+      # Frequency in seconds to print stats about connection (messages/bytes
+      # per second). Set to 0 to disable.
+      - PRINT_STATS_PERIOD=${PRINT_STATS_PERIOD:-10}
+      # Frequency in seconds that Firehose should send a synthetic "keepalive"
+      # message to help connector ensure the connection is still alive. If no
+      # such message is received within roughly $keepalive seconds, connector
+      # will automatically reconnect to Firehose.
+      - KEEPALIVE=${KEEPALIVE:-60}
+      # "Time mode" of Firehose init command. Can be "live" or "pitr <pitr>";
+      # range is currently not supported.
+      # See https://flightaware.com/commercial/firehose/documentation/commands
+      # for more details.
+      - INIT_CMD_TIME=${INIT_CMD_TIME:-live}
+      # The "optional" section of the Firehose init command. Mostly consists of
+      # filters for the data. Do not put username, password, keepalive, or
+      # compression commands here. Documentation at
+      # https://flightaware.com/commercial/firehose/documentation/commands
+      - INIT_CMD_ARGS=${INIT_CMD_ARGS:-}
+      # Whether connector should immediately connect to Firehose upon starting
+      # (1) or wait until its first client has connected before it connects to
+      # Firehose (0).
+      - START_IMMEDIATELY=${START_IMMEDIATELY:-0}
+      - PYTHONUNBUFFERED=1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+  db-updater:
+    image: "firestarter_db-updater:1.0"
+    build: ./db-updater
+    init: true
+    networks:
+      - internal
+    environment:
+      # URL to database that will be updated based on Firehose contents.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - DB_URL=${DB_URL:-sqlite:///db/flights.db}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - data:/home/firestarter/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+  fids:
+    image: "firestarter_fids:1.0"
+    build: ./fids
+    init: true
+    ports:
+      # Port upon which to serve webapp
+      - "${WEB_SERVER_PORT:-5000}:5000"
+    networks:
+      - internal
+    environment:
+      # URL to database that is being updated by db-updater.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - DB_URL=${DB_URL:-sqlite:///db/flights.db}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - data:/home/firestarter/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+volumes:
+  data:
+
+networks:
+  internal:

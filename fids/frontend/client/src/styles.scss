@@ -1,0 +1,379 @@
+@import "./variables.scss";
+@import "~bootstrap/scss/bootstrap";
+
+body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.app {
+    height: 100%;
+}
+
+.flight-info-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    height: 100%;
+    //margin-top: -56px;
+    color: $midnight-blue;
+    font-family: $Lato;
+}
+
+.landing-page-wrapper {
+    @include flexBox;
+    @include flexCenter;
+    @include flexAlignCenter;
+    @include flexDirectionColumn;
+    width: 100%;
+    height: 100%;
+    h3 {
+        font-family: $Lato;
+        color: $midnight-blue;
+        font-size: .9rem;
+        margin: 15px 0;
+        text-align: center;
+    }
+}
+
+.landing-page-title {
+    @include flexBox;
+    @include flexDirectionColumn;
+    @include flexCenter;
+    text-align: center;
+    margin: 0 0 40px 0;
+    span {
+        margin: 10px 0;
+        &.page-title {
+            font-size: 36px;
+            font-family: $Lato;
+            color: $midnight-blue;
+            letter-spacing: 0.2rem;
+        }
+        &.page-subtitle {
+            font-size: 16px;
+            font-family: $Lato;
+            color: $midnight-blue;
+        }
+    }
+}
+
+.search-wrapper {
+    @include flexBox;
+    @include flexCenter;
+    @include flexAlignCenter;
+    @include flexDirectionColumn;
+    width: 100%;
+}
+
+.single-airport-search-wrapper, .city-pair-search-wrapper {
+    @include flexBox;
+    @include flexCenter;
+    @include flexAlignCenter;
+    @include flexDirectionColumn;
+    width: 80%;
+}
+
+.search-row {
+    @include flexBox;
+    @include flexAlignEnd;
+    @include flexDirectionRow;
+    @include flexSpaceBetween;
+    width: 300px;
+}
+
+.airport-input-group {
+    @include flexBox;
+    @include flexDirectionColumn;
+    width: 225px;
+    input {
+        font-family: $Helvetica;
+        font-size: 14px;
+        height: 40px;
+        width: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.125);
+        border-radius: 3px;
+        padding: 0 10px;
+        &::placeholder {
+            font-style: italic;
+        }
+    }
+    label {
+        font-family: $Lato;
+        color: $midnight-blue;
+        margin: 0;
+    }
+}
+
+.input-group-origin {
+    margin-right: 10px;
+}
+
+.submit-button {
+    @include flexBox;
+    @include flexCenter;
+    @include flexAlignCenter;
+    width: 40px;
+    height: 40px;
+    border: 1px solid $cerulean;
+    border-radius: 3px;
+    background-color: $cerulean;
+    margin-left: 10px;
+    text-decoration: none;
+    font-family: $Helvetica;
+    font-size: 14px;
+    &:visited, &:link {
+        color: $white;
+    }
+}
+
+.airport-list-link {
+    display: flex;
+    justify-content: center;
+    text-decoration: none;
+    color: $midnight-blue;
+    &:hover {
+        color: $midnight-blue;
+        text-decoration: underline;
+    }
+}
+
+.loading-spinner {
+    @include flexBox;
+    @include flexCenter;
+    @include flexAlignCenter;
+    height: 592px;
+    width: 300px;
+}
+
+.radio-button-container {
+    display: flex;
+    justify-content: center;
+    width: 300px;
+    margin-top: 5px;
+    padding: 0;
+}
+
+.airport-page-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+}
+
+.airport-page-tables-wrapper {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 5px;
+    overflow: auto;
+}
+
+.airport-page-title {
+    width: 100%;
+    text-align: center;
+    font-family: $Lato;
+    font-size: 36px;
+    color: $midnight-blue;
+    margin: 3rem 0;
+}
+
+.table-wrapper {
+    height: auto;
+    width: 100%;
+    padding: 10px;
+}
+
+.table-title {
+    grid-area: title;
+    align-self: center;
+    font-family: $Lato;
+    font-size: 24px;
+    color: $midnight-blue;
+    text-align: center;
+}
+
+.airport-page-table-inner {
+    grid-area: table;
+    height: 100%;
+    width: 100%;
+}
+
+.topAirport-list-group {
+    width: 300px;
+}
+
+.topAirport-list-container {
+    width: 300px;
+    padding: 0;
+}
+
+.topAirport-list-container-title {
+    font-family: $Lato;
+    color: $midnight-blue;
+}
+
+.topAirport-list-container-subtitle {
+    font-family: $Lato;
+    font-size: 12px;
+    color: $midnight-blue;
+}
+
+.top-airport-item {
+    font-family: $Lato;
+    color: $midnight-blue;
+    font-weight: bold;
+}
+
+// Styles for the Flight Info Page
+
+.flight-number {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    font-family: $Lato;
+    font-size: 30px;
+    color: $midnight-blue;
+
+}
+
+.flight-numbers-row {
+    font-size: 14px;
+    font-family: $HelveticaLight;
+}
+
+.flight-status-row {
+    font-size: 14px;
+    font-family: $Helvetica;
+}
+
+.flight-cancel {
+    color: $red;
+    font-size: 18px;
+    font-family: $Helvetica;
+}
+
+.estimated-cancel {
+    font-style: italic;
+    color: $red;
+    font-size: 18px;
+    font-family: $Helvetica;
+}
+
+.actual {
+    font-family: $Helvetica;
+    color: $green;
+    font-weight: bold;
+}
+
+.estimated {
+    font-style: italic;
+    color: $green;
+}
+
+.estimated-gate {
+    font-size: 24px;
+    font-style: italic;
+    color: $midnight-blue;
+    font-family: $HelveticaLight;
+}
+
+.origin-dest-title {
+    font-size: 24px;
+    font-family: $HelveticaLight;
+    color: $midnight-blue;
+}
+
+.origin-dest-wrapper {
+    margin-bottom: 20px;
+}
+
+.origin-dest-data {
+    font-size: 36px;
+    font-family: $Helvetica;
+    color: $midnight-blue;
+}
+
+.origin-dest-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 250px;
+}
+
+.gate-number {
+    font-size: 24px;
+    color: $midnight-blue;
+    font-family: $HelveticaLight;
+}
+
+.no-gate {
+    height: 36px;
+    font-style: italic;
+    color: $midnight-blue;
+    font-family: $HelveticaLight;
+}
+
+.baggage-claim {
+    font-style: italic;
+    color: $midnight-blue;
+    font-size: 14px;
+}
+
+.detail-card {
+    margin-bottom: 10px;
+}
+
+.detail-card-title {
+    margin: 0;
+}
+
+.detail-card-subtitle {
+    font-family: $HelveticaLight;
+}
+
+.actual-time {
+}
+
+.estimated-time {
+    font-style: italic;
+}
+
+.scheduled-time {
+   font-family: $HelveticaLight;
+   font-size: 12px; 
+}
+
+.not-available {
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.airport-table-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 460px;
+    width: 100%
+}
+
+// Material table styles
+
+.MuiToolbar-root {
+    color: $midnight-blue
+}
+
+.MuiTableSortLabel-root:hover {
+    color: $white;
+}
+
+a {
+    color: $midnight-blue;
+    &:hover {
+        color: $midnight-blue;
+    }
+}
