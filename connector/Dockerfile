@@ -1,16 +1,20 @@
 FROM python:3.8-slim-buster
 
+RUN apt-get update && apt-get install -y make
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
 
-ENV VIRTUAL_ENV=./venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+COPY --chown=firestarter Makefile.inc .
 
-COPY --chown=firestarter requirements.txt .
-RUN pip install -r requirements.txt
-COPY --chown=firestarter main.py .
+RUN mkdir connector
+WORKDIR /home/firestarter/connector
+COPY --chown=firestarter connector/requirements ./requirements
+COPY --chown=firestarter connector/main.py .
+COPY --chown=firestarter connector/Makefile .
 
-CMD ["python3", "main.py"]
+RUN make docker-setup
+
+ENTRYPOINT ["venv/bin/python3"]
+CMD ["main.py"]
 

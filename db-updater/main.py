@@ -320,7 +320,7 @@ def main():
     while True:
         try:
             consumer = KafkaConsumer(
-               'feed1',
+                os.getenv("KAFKA_TOPIC_NAME"),
                 auto_offset_reset='earliest',
                 enable_auto_commit=True,
                 auto_commit_interval_ms=1000,

@@ -3,7 +3,9 @@ version: '3.7'
 services:
   connector:
     image: "firestarter_connector:1.0"
-    build: ./connector
+    build:
+      context: .
+      dockerfile: connector/Dockerfile
     init: true
     networks:
       - internal
@@ -43,6 +45,8 @@ services:
       # (1) or wait until its first client has connected before it connects to
       # Firehose (0).
       - PYTHONUNBUFFERED=1
+      # Each consumer should have its own unique kafka topic name
+      - KAFKA_TOPIC_NAME=feed1
     logging:
       driver: "json-file"
       options:
@@ -51,7 +55,9 @@ services:
 
   db-updater:
     image: "firestarter_db-updater:1.0"
-    build: ./db-updater
+    build:
+      context: .
+      dockerfile: db-updater/Dockerfile
     init: true
     networks:
       - internal
@@ -60,8 +66,10 @@ services:
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
+      # Same kafka topic name as the consumer of the feed that you want to consume
+      - KAFKA_TOPIC_NAME=feed1
     volumes:
-      - data:/home/firestarter/db
+      - data:/home/firestarter/db-updater/db
     logging:
       driver: "json-file"
       options:
@@ -70,7 +78,9 @@ services:
 
   fids:
     image: "firestarter_fids:1.0"
-    build: ./fids
+    build:
+      context: .
+      dockerfile: fids/Dockerfile
     init: true
     ports:
       # Port upon which to serve webapp
@@ -83,7 +93,7 @@ services:
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
     volumes:
-      - data:/home/firestarter/db
+      - data:/home/firestarter/fids/db
     logging:
       driver: "json-file"
       options:
@@ -113,9 +123,11 @@ services:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
       # Retain messages for 1 hour
-      - KAFKA_CFG_LOG_RETENTION_CHECK_INTERVAL_MS=3600000
+      - KAFKA_CFG_LOG_RETENTION_HOURS=1
     volumes:
       - kafka_data:/bitnami/kafka
+    depends_on:
+      - zookeeper
 
 
 volumes:

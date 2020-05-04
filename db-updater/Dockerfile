@@ -1,18 +1,20 @@
 FROM python:3.8-slim-buster
 
-RUN apt-get update && apt-get install -y libpq-dev gcc
+RUN apt-get update && apt-get install -y libpq-dev gcc make
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
 
-ENV VIRTUAL_ENV=./venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+COPY --chown=firestarter Makefile.inc .
 
+RUN mkdir db-updater
+WORKDIR /home/firestarter/db-updater
 RUN mkdir db
+COPY --chown=firestarter db-updater/requirements ./requirements
+COPY --chown=firestarter db-updater/main.py .
+COPY --chown=firestarter db-updater/Makefile .
 
-COPY --chown=firestarter requirements.txt .
-RUN pip install -r requirements.txt
-COPY --chown=firestarter main.py .
+RUN make docker-setup
 
-CMD ["python3", "main.py"]
+ENTRYPOINT ["venv/bin/python3"]
+CMD ["main.py"]

@@ -191,7 +191,7 @@ async def read_firehose(time_mode):
             lines_read += 1
             bytes_read += len(line)
 
-        producer.send('feed1', line)
+        producer.send(os.getenv("KAFKA_TOPIC_NAME"), line)
         producer.flush()
 
     # We'll only reach this point if something's wrong with the connection.
