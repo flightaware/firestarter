@@ -9,6 +9,8 @@ import threading
 import time
 import traceback
 import warnings
+from kafka import KafkaConsumer
+from kafka.errors import NoBrokersAvailable
 
 import sqlalchemy as sa
 from sqlalchemy.sql import func, select, bindparam, and_
@@ -315,28 +317,32 @@ def main():
         "keepalive": process_keepalive_message,
     }
 
-    connector = ("connector", 1601)
     while True:
         try:
-            with socket.create_connection(connector) as sock:
-                threading.Thread(
-                    target=flush_cache, name="flush_cache", args=(engine,)
-                ).start()
-                threading.Thread(
-                    target=expire_old_flights, name="expire", args=(engine,)
-                ).start()
-                for line in sock.makefile():
-                    message = json.loads(line)
-                    processor_functions.get(message["type"], process_unknown_message)(
-                        message
-                    )
-                print("Got EOF from connector, quitting")
-                break
-        except socket.timeout:
-            print("Socket timed out, trying to reconnect")
-            time.sleep(3)
-        except OSError as e:
-            print(f"Connector isn't available ({e}), trying again in a few seconds")
+            consumer = KafkaConsumer(
+               'feed1',
+                auto_offset_reset='earliest',
+                enable_auto_commit=True,
+                auto_commit_interval_ms=1000,
+                bootstrap_servers=['kafka:9092'],
+                group_id='feed1')
+
+            threading.Thread(
+                target=flush_cache, name="flush_cache", args=(engine,)
+            ).start()
+            threading.Thread(
+                target=expire_old_flights, name="expire", args=(engine,)
+            ).start()
+            for m in consumer:
+                print (m.offset)
+                message = json.loads(m.value)
+                processor_functions.get(message["type"], process_unknown_message)(
+                    message
+                )
+            print("Got EOF from kafka, quitting")
+            break
+        except (OSError, NoBrokersAvailable) as e:
+            print(f"Kafka isn't available ({e}), trying again in a few seconds")
             time.sleep(3)
 
 

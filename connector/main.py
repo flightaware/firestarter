@@ -4,7 +4,8 @@ import os
 import time
 import warnings
 import zlib
-
+from kafka import KafkaProducer
+from kafka.errors import NoBrokersAvailable
 
 class ZlibReaderProtocol(asyncio.StreamReaderProtocol):
     """asyncio Protocol that handles streaming decompression of Firehose data"""
@@ -62,10 +63,7 @@ def build_init_cmd(time_mode):
     return initiation_command
 
 
-writers_lock = None
-writers = []
 stats_lock = None
-start_event = None
 finished = None
 lines_read = 0
 bytes_read = 0
@@ -93,7 +91,6 @@ def parse_script_args():
             raise ValueError(
                 f'$INIT_CMD_ARGS should not contain the "{command}" command. It belongs in its own variable.'
             )
-    start_immediately = int(os.getenv("START_IMMEDIATELY"))
 
 
 async def event_wait(event, timeout):
@@ -109,7 +106,6 @@ async def event_wait(event, timeout):
 async def print_stats(period):
     """Periodically print information about how much data is flowing from Firehose."""
     global lines_read, bytes_read, finished, last_good_pitr
-    await start_event.wait()
     total_lines = 0
     total_bytes = 0
     initial_seconds = time.monotonic()
@@ -159,7 +155,7 @@ async def read_firehose(time_mode):
     time_mode may be either the string "live" or a pitr string that looks like
     "pitr <pitr>" where <pitr> is a value previously returned by this function
     """
-    global lines_read, bytes_read, last_good_pitr
+    global lines_read, bytes_read, last_good_pitr, producer
     fh_reader, fh_writer = await open_connection(host=servername, port=1501, ssl=True)
     print(f"Opened connection to Firehose at {servername}:1501")
 
@@ -195,40 +191,30 @@ async def read_firehose(time_mode):
             lines_read += 1
             bytes_read += len(line)
 
-        async with writers_lock:
-            for writer in writers:
-                try:
-                    writer.write(line)
-                    await writer.drain()
-                except OSError as e:
-                    writers.remove(writer)
-                    client = writer.transport.get_extra_info("peername")
-                    print(f"Lost client connection with {client}:", e)
+        producer.send('feed1', line)
+        producer.flush()
 
     # We'll only reach this point if something's wrong with the connection.
     return pitr
 
 
-async def client_connected(reader, writer):
-    client = writer.transport.get_extra_info("peername")
-    print("Got client connection from", client)
-    async with writers_lock:
-        writers.append(writer)
-    start_event.set()
-
-
 async def main():
-    global writers_lock, stats_lock, start_event, finished, last_good_pitr
-    writers_lock = asyncio.Lock()
+    global stats_lock, finished, last_good_pitr, producer
+
+    producer = None
+    while producer is None:
+        try:
+            producer = KafkaProducer(bootstrap_servers=['kafka:9092'])
+        except NoBrokersAvailable as e:
+            print(f"Kafka isn't available ({e}), trying again in a few seconds")
+            time.sleep(3)
+
     stats_lock = asyncio.Lock()
-    start_event = asyncio.Event()
     finished = asyncio.Event()
     last_good_pitr = None
     LISTEN_PORT = 1601
 
     parse_script_args()
-    server = await asyncio.start_server(client_connected, port=LISTEN_PORT)
-    print(f"Server is listening on all interfaces at port {LISTEN_PORT}")
 
     stats_task = None
     if stats_period:
@@ -237,12 +223,6 @@ async def main():
     errors = 0
     time_mode = init_cmd_time
     while True:
-        if start_immediately or start_event.is_set():
-            start_event.set()
-        else:
-            print("Waiting for first client connection to start Firehose connection")
-            await start_event.wait()
-        print()
         pitr = await read_firehose(time_mode)
         if pitr:
             time_mode = f"pitr {pitr}"
@@ -256,12 +236,7 @@ async def main():
                 f"Connection failed {CONNECTION_ERROR_LIMIT} times before getting a non-error message, quitting"
             )
             break
-    for writer in writers:
-        if writer.can_write_eof():
-            writer.write_eof()
-        print(f"Closing connection to {writer.transport.get_extra_info('peername')}")
-        writer.close()
-        await writer.wait_closed()
+
     if stats_task:
         print("Dumping stats one last time...")
         finished.set()
