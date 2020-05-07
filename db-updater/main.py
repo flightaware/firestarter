@@ -338,7 +338,6 @@ def main():
             threading.Thread(target=flush_cache, name="flush_cache", args=(ENGINE,)).start()
             threading.Thread(target=expire_old_flights, name="expire", args=(ENGINE,)).start()
             for msg in consumer:
-                print(msg.offset)
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
             print("Got EOF from kafka, quitting")
