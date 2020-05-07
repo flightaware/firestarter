@@ -17,13 +17,13 @@ pip-sync: venv pip-compile
 docker-setup: venv pip-sync
 
 type-check:
-	. venv/bin/activate && mypy --check-untyped-defs --package .
+	. venv/bin/activate && mypy --check-untyped-defs .
 
 format:
 	. venv/bin/activate && $(PYTHON) -m $(BLACK) --line-length=100 .
 
 lint:
-	. venv/bin/activate && $(PYTHON) -m $(PYLINT) .
+	. venv/bin/activate && $(PYTHON) -m $(PYLINT) *.py
 
 check: lint type-check
 

@@ -7,4 +7,4 @@ all: $(outputs)
 %.txt: %.in
 	. ../venv/bin/activate && pip-compile --verbose --build-isolation --generate-hashes --output-file $@ $<
 
-test.txt: base.txt
+dev.txt: base.txt

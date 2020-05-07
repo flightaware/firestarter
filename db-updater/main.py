@@ -1,19 +1,20 @@
+"""Read flight updates from kafka and store them into the database"""
+
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
-import enum
 from itertools import zip_longest, takewhile, chain
 import json
 import os
-import socket
 import threading
 import time
 import traceback
 import warnings
-from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
+from typing import Optional, Generator, KeysView
+from kafka import KafkaConsumer  # type: ignore
+from kafka.errors import NoBrokersAvailable  # type: ignore
 
-import sqlalchemy as sa
-from sqlalchemy.sql import func, select, bindparam, and_
+import sqlalchemy as sa  # type: ignore
+from sqlalchemy.sql import func, select, bindparam, and_  # type: ignore
 
 # SQLAlchemy doesn't properly understand when you use columns with a "key"
 # property with PostgreSQL's on_conflict_do_update statement, so it prints a
@@ -21,19 +22,15 @@ from sqlalchemy.sql import func, select, bindparam, and_
 warnings.filterwarnings("ignore", message="Additional column names not matching.*")
 
 UTC = timezone.utc
-TimestampTZ = lambda: sa.TIMESTAMP(timezone=True)
-meta = sa.MetaData()
-flights = sa.Table(
+TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
+META = sa.MetaData()
+FLIGHTS = sa.Table(
     "flights",
-    meta,
+    META,
     sa.Column("id", sa.String, primary_key=True),
-    sa.Column("added", TimestampTZ(), nullable=False, server_default=func.now()),
+    sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
     sa.Column(
-        "changed",
-        TimestampTZ(),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+        "changed", TIMESTAMP_TZ(), nullable=False, server_default=func.now(), onupdate=func.now(),
     ),
     sa.Column("flight_number", sa.String, key="ident"),
     sa.Column("registration", sa.String, key="reg"),
@@ -59,93 +56,97 @@ flights = sa.Table(
     sa.Column("actual_departure_terminal", sa.String),
     sa.Column("scheduled_departure_terminal", sa.String),
     sa.Column("baggage_claim", sa.String),
-    sa.Column("cancelled", TimestampTZ()),
-    sa.Column("filed_off", TimestampTZ(), key="fdt"),
-    sa.Column("actual_out", TimestampTZ()),
-    sa.Column("actual_off", TimestampTZ(), key="adt"),
-    sa.Column("actual_on", TimestampTZ(), key="aat"),
-    sa.Column("actual_in", TimestampTZ()),
-    sa.Column("estimated_out", TimestampTZ()),
-    sa.Column("estimated_off", TimestampTZ(), key="edt"),
-    sa.Column("estimated_on", TimestampTZ(), key="eta"),
-    sa.Column("estimated_in", TimestampTZ()),
-    sa.Column("scheduled_out", TimestampTZ()),
-    sa.Column("scheduled_in", TimestampTZ()),
-    sa.Column("predicted_out", TimestampTZ()),
-    sa.Column("predicted_off", TimestampTZ()),
-    sa.Column("predicted_on", TimestampTZ()),
-    sa.Column("predicted_in", TimestampTZ()),
+    sa.Column("cancelled", TIMESTAMP_TZ()),
+    sa.Column("filed_off", TIMESTAMP_TZ(), key="fdt"),
+    sa.Column("actual_out", TIMESTAMP_TZ()),
+    sa.Column("actual_off", TIMESTAMP_TZ(), key="adt"),
+    sa.Column("actual_on", TIMESTAMP_TZ(), key="aat"),
+    sa.Column("actual_in", TIMESTAMP_TZ()),
+    sa.Column("estimated_out", TIMESTAMP_TZ()),
+    sa.Column("estimated_off", TIMESTAMP_TZ(), key="edt"),
+    sa.Column("estimated_on", TIMESTAMP_TZ(), key="eta"),
+    sa.Column("estimated_in", TIMESTAMP_TZ()),
+    sa.Column("scheduled_out", TIMESTAMP_TZ()),
+    sa.Column("scheduled_in", TIMESTAMP_TZ()),
+    sa.Column("predicted_out", TIMESTAMP_TZ()),
+    sa.Column("predicted_off", TIMESTAMP_TZ()),
+    sa.Column("predicted_on", TIMESTAMP_TZ()),
+    sa.Column("predicted_in", TIMESTAMP_TZ()),
 )
 
-engine_args = {}
-if "postgresql" in os.getenv("DB_URL"):
+engine_args: dict = {}
+db_url: str = os.getenv("DB_URL")  # type: ignore
+if "postgresql" in db_url:
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
     # performance even more.
     # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#psycopg2-fast-execution-helpers
     engine_args["executemany_mode"] = "values"
-elif "sqlite" in os.getenv("DB_URL"):
+elif "sqlite" in db_url:
     # isolation_level setting works around buggy Python sqlite driver behavior
     # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl
     # timeout setting ensures we don't encounter timeouts when multiple threads
     # are trying to write to the database
     engine_args["connect_args"] = {"timeout": 60, "isolation_level": None}
 
-engine = sa.create_engine(os.getenv("DB_URL"), **engine_args)
+ENGINE = sa.create_engine(db_url, **engine_args)
 
 # Columns in the table that we'll explicitly be setting
-msg_table_cols = {c for c in flights.c if c.server_default is None}
+MSG_TABLE_COLS = {c for c in FLIGHTS.c if c.server_default is None}
 # The keys in a message that we want in the flights table
-msg_table_keys = {c.key for c in msg_table_cols}
+MSG_TABLE_KEYS = {c.key for c in MSG_TABLE_COLS}
 
-finished = threading.Event()
-cache_lock = threading.Lock()
+FINISHED = threading.Event()
+CACHE_LOCK = threading.Lock()
 # Use a cache for accumulating flight information, flushing it to the database
 # as necessary.  It should contain full versions of flight rows (rather than
 # the sparse ones we might get if we just insert/update flights according to
 # received data) to ensure proper behavior of executemany-style SQLAlchemy
 # statements.
 # https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
-cache = defaultdict(lambda: dict.fromkeys(msg_table_keys))
+CACHE = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
 
 SQLITE_VAR_LIMIT = None
 
 
-@sa.event.listens_for(engine, "begin")
-def do_begin(conn):
-    if engine.name != "sqlite":
+@sa.event.listens_for(ENGINE, "begin")
+def do_begin(conn: sa.engine.Transaction) -> None:
+    """emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
+    error if we happen to expire flights between the flush_cache thread's
+    read and write (more info about how this can occur:
+    https://www.sqlite.org/rescode.html#busy_snapshot)
+    """
+    if ENGINE.name != "sqlite":
         return
-    # emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
-    # error if we happen to expire flights between the flush_cache thread's
-    # read and write (more info about how this can occur:
-    # https://www.sqlite.org/rescode.html#busy_snapshot)
+
     conn.execute("BEGIN IMMEDIATE")
 
 
-def convert_msg_fields(msg):
+def convert_msg_fields(msg: dict) -> dict:
     """Remove unneeded keys from message JSON and convert value types.
 
     Modifies msg in-place and returns it."""
-    for key in msg.keys() - msg_table_keys:
+    for key in msg.keys() - MSG_TABLE_KEYS:
         del msg[key]
-    for k, v in msg.items():
-        column_type = str(flights.c[k].type)
+    for key, val in msg.items():
+        column_type = str(FLIGHTS.c[key].type)
         if column_type == "TIMESTAMP":
-            msg[k] = datetime.fromtimestamp(int(v), tz=UTC)
+            msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
         elif column_type == "INTEGER":
-            msg[k] = int(v)
+            msg[key] = int(val)
         elif column_type == "BOOLEAN":
-            msg[k] = bool(int(v))
+            msg[key] = bool(int(val))
     return msg
 
 
-def insert_or_update(data):
+def insert_or_update(data: dict) -> None:
+    """Insert new row into the database or update an existing row"""
     converted = convert_msg_fields(data)
-    with cache_lock:
-        cache[converted["id"]].update(converted)
+    with CACHE_LOCK:
+        CACHE[converted["id"]].update(converted)
 
 
-def chunk(values, chunk_size):
+def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
     """Splits a sequence into separate sequences of equal size (besides the last)
 
     values is the sequence that you want to split
@@ -157,49 +158,47 @@ def chunk(values, chunk_size):
         # Prevent padding behavior of zip_longest
         for group in zip_longest(*args):
             yield takewhile(lambda x: x is not None, group)
-    else:
-        return [values]
+    return [values]
 
 
-def flush_cache(engine):
-    while not finished.is_set():
-        finished.wait(2)
-        with cache_lock, engine.begin() as conn:
-            if not cache:
+def flush_cache(engine: sa.engine) -> None:
+    """Add flights into the database"""
+    while not FINISHED.is_set():
+        FINISHED.wait(2)
+        with CACHE_LOCK, engine.begin() as conn:
+            if not CACHE:
                 continue
-            print(f"Flushing {len(cache)} new/updated flights to database")
+            print(f"Flushing {len(CACHE)} new/updated flights to database")
             if engine.name == "postgresql":
                 # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
-                from sqlalchemy.dialects.postgresql import insert
+                # pylint: disable=import-outside-toplevel
+                from sqlalchemy.dialects.postgresql import insert  # type: ignore
 
-                statement = insert(flights)
+                statement = insert(FLIGHTS)
                 # This builds the "SET ?=?" part of the update statement,
                 # making sure to keep the row's current values if they're
                 # non-null and the new row's are null
                 col_updates = {
-                    c.name: func.coalesce(statement.excluded[c.key], c)
-                    for c in msg_table_cols
+                    c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS
                 }
                 # on_conflict_do_update won't handle Columns with onupdate set.
                 # Have to do it ourselves.
                 # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
                 col_updates["changed"] = func.now()
-                statement = statement.on_conflict_do_update(
-                    index_elements=["id"], set_=col_updates
-                )
-                conn.execute(statement, *cache.values())
+                statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
+                conn.execute(statement, *CACHE.values())
             else:
                 updates = []
                 # Get all rows from database that will need updating. Parameter
                 # list is chunked as needed to prevent overrunning sqlite
                 # limits: https://www.sqlite.org/limits.html#max_variable_number
-                id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
+                id_chunks = chunk(CACHE.keys(), SQLITE_VAR_LIMIT)
                 existing = chain.from_iterable(
-                    conn.execute(select([flights]).where(flights.c.id.in_(keys)))
+                    conn.execute(select([FLIGHTS]).where(FLIGHTS.c.id.in_(keys)))
                     for keys in id_chunks
                 )
                 for flight in existing:
-                    cache_flight = cache.pop(flight["id"])
+                    cache_flight = CACHE.pop(flight["id"])
                     for k in cache_flight:
                         if cache_flight[k] is None:
                             cache_flight[k] = flight[k]
@@ -209,34 +208,31 @@ def flush_cache(engine):
                     updates.append(cache_flight)
                 # We removed the to-be-updated flights from the cache, so
                 # insert the rest
-                inserts = cache.values()
+                inserts = CACHE.values()
+                # pylint: disable=no-value-for-parameter
                 if updates:
                     conn.execute(
-                        flights.update().where(flights.c.id == bindparam("_id")),
-                        *updates,
+                        FLIGHTS.update().where(FLIGHTS.c.id == bindparam("_id")), *updates,
                     )
                 if inserts:
-                    conn.execute(flights.insert(), *inserts)
-            cache.clear()
+                    conn.execute(FLIGHTS.insert(), *inserts)
+            CACHE.clear()
 
 
-def expire_old_flights(engine):
-    while not finished.is_set():
-        finished.wait(60)
+def expire_old_flights(engine: sa.engine) -> None:
+    """Wrapper for _expire_old_flights"""
+    while not FINISHED.is_set():
+        FINISHED.wait(60)
         _expire_old_flights(engine)
 
 
-def _expire_old_flights(engine):
+def _expire_old_flights(engine: sa.engine) -> None:
+    """Remove flights from the database if they have not been updated in 48 hours"""
     dropoff = datetime.now(tz=UTC) - timedelta(hours=48)
     dtmin = datetime.min.replace(tzinfo=UTC)
-    statement = flights.delete().where(
-        and_(
-            *(
-                func.coalesce(c, dtmin) < dropoff
-                for c in flights.c
-                if str(c.type) == "TIMESTAMP"
-            )
-        )
+    # pylint: disable=no-value-for-parameter
+    statement = FLIGHTS.delete().where(
+        and_(*(func.coalesce(c, dtmin) < dropoff for c in FLIGHTS.c if str(c.type) == "TIMESTAMP"))
     )
     result = engine.execute(statement)
     if result.rowcount:
@@ -244,49 +240,61 @@ def _expire_old_flights(engine):
     result.close()
 
 
-def process_unknown_message(data):
+def process_unknown_message(data: dict) -> None:
+    """Unknown message type"""
     print(f"Don't know how to handle message with type {data['type']}")
 
 
-def process_arrival_message(data):
+def process_arrival_message(data: dict) -> None:
+    """Arrival message type"""
     return insert_or_update(data)
 
 
-def process_cancellation_message(data):
+def process_cancellation_message(data: dict) -> None:
+    """Cancel message type"""
     data["cancelled"] = data["pitr"]
     return insert_or_update(data)
 
 
-def process_departure_message(data):
+def process_departure_message(data: dict) -> None:
+    """Departure message type"""
     return insert_or_update(data)
 
 
-def process_offblock_message(data):
+def process_offblock_message(data: dict) -> None:
+    """Offblock message type"""
     data["actual_out"] = data["clock"]
     return insert_or_update(data)
 
 
-def process_onblock_message(data):
+def process_onblock_message(data: dict) -> None:
+    """Onblock message type"""
     data["actual_in"] = data["clock"]
     return insert_or_update(data)
 
 
-def process_extendedFlightInfo_message(data):
+def process_extended_flight_info_message(data: dict) -> None:
+    """extendedFlightInfo message type"""
     return insert_or_update(data)
 
 
-def process_flightplan_message(data):
+def process_flightplan_message(data: dict) -> None:
+    """Flightplan message type"""
     return insert_or_update(data)
 
 
-def process_keepalive_message(data):
+def process_keepalive_message(data: dict) -> None:
+    """Keepalive message type"""
     behind = datetime.now(tz=UTC) - datetime.fromtimestamp(int(data["pitr"]), tz=UTC)
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
 
 
-def setup_sqlite(engine):
+def setup_sqlite(engine: sa.engine) -> None:
+    """Set proper sqlite configurations"""
+
     # WAL mode allows reading the db while it's being written to
     engine.scalar("PRAGMA journal_mode=WAL")
+    # pylint: disable=global-statement
     global SQLITE_VAR_LIMIT
     # SQLite's default
     SQLITE_VAR_LIMIT = 999
@@ -297,14 +305,13 @@ def setup_sqlite(engine):
 
 
 def main():
-    if engine.name == "sqlite":
-        setup_sqlite(engine)
-    if engine.has_table("flights"):
-        print(
-            "flights table already exists, clearing expired flights before continuing"
-        )
-        _expire_old_flights(engine)
-    meta.create_all(engine)
+    """Read flight updates from kafka and store them into the database"""
+    if ENGINE.name == "sqlite":
+        setup_sqlite(ENGINE)
+    if ENGINE.has_table("flights"):
+        print("flights table already exists, clearing expired flights before continuing")
+        _expire_old_flights(ENGINE)
+    META.create_all(ENGINE)
 
     processor_functions = {
         "arrival": process_arrival_message,
@@ -312,7 +319,7 @@ def main():
         "cancellation": process_cancellation_message,
         "offblock": process_offblock_message,
         "onblock": process_onblock_message,
-        "extendedFlightInfo": process_extendedFlightInfo_message,
+        "extendedFlightInfo": process_extended_flight_info_message,
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
     }
@@ -321,38 +328,32 @@ def main():
         try:
             consumer = KafkaConsumer(
                 os.getenv("KAFKA_TOPIC_NAME"),
-                auto_offset_reset='earliest',
+                auto_offset_reset="earliest",
                 enable_auto_commit=True,
                 auto_commit_interval_ms=1000,
-                bootstrap_servers=['kafka:9092'],
-                group_id='feed1')
+                bootstrap_servers=["kafka:9092"],
+                group_id="feed1",
+            )
 
-            threading.Thread(
-                target=flush_cache, name="flush_cache", args=(engine,)
-            ).start()
-            threading.Thread(
-                target=expire_old_flights, name="expire", args=(engine,)
-            ).start()
-            for m in consumer:
-                print (m.offset)
-                message = json.loads(m.value)
-                processor_functions.get(message["type"], process_unknown_message)(
-                    message
-                )
+            threading.Thread(target=flush_cache, name="flush_cache", args=(ENGINE,)).start()
+            threading.Thread(target=expire_old_flights, name="expire", args=(ENGINE,)).start()
+            for msg in consumer:
+                print(msg.offset)
+                message = json.loads(msg.value)
+                processor_functions.get(message["type"], process_unknown_message)(message)
             print("Got EOF from kafka, quitting")
             break
-        except (OSError, NoBrokersAvailable) as e:
-            print(f"Kafka isn't available ({e}), trying again in a few seconds")
+        except (OSError, NoBrokersAvailable) as error:
+            print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
 
 
 if __name__ == "__main__":
+    # pylint: disable=broad-except
     try:
         main()
-    except Exception as e:
+    except Exception as error:
         traceback.print_exc()
-        print(
-            "\nQuitting due to exception, wait a moment for cache flush to database\n"
-        )
+        print("\nQuitting due to exception, wait a moment for cache flush to database\n")
     finally:
-        finished.set()
+        FINISHED.set()
