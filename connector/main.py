@@ -4,6 +4,7 @@
 import asyncio
 import json
 import os
+import ssl
 import time
 import warnings
 import zlib
@@ -186,7 +187,9 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     # pylint: disable=global-statement
     global LAST_GOOD_PITR, LINES_READ, BYTES_READ
 
-    fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=True)
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=context)
     print(f"Opened connection to Firehose at {SERVERNAME}:1501")
 
     initiation_command = build_init_cmd(time_mode)
