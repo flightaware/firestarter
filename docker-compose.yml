@@ -67,7 +67,10 @@ services:
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the consumer of the feed that you want to consume
-      - KAFKA_TOPIC_NAME=feed1
+      - KAFKA_TOPIC_NAME=${KAFKA_TOPIC_NAME:-feed1}
+      # Consumers with the same group name will split the data between them,
+      # but consumers with different group names will each receive all of the messages 
+      - KAFKA_GROUP_NAME=${KAFKA_GROUP_NAME:-group1}
     volumes:
       - data:/home/firestarter/db-updater/db
     logging:

@@ -23,11 +23,15 @@ STATS_PERIOD: int
 
 STATS_LOCK: asyncio.Lock
 FINISHED: asyncio.Event
-LINES_READ: int = 0
-BYTES_READ: int = 0
-LAST_GOOD_PITR: Optional[int]
+
 LISTEN_PORT: int
+
 PRODUCER: KafkaProducer
+
+# pylint: disable=invalid-name
+lines_read: int = 0
+bytes_read: int = 0
+last_good_pitr: Optional[int]
 
 
 class ZlibReaderProtocol(asyncio.StreamReaderProtocol):
@@ -130,7 +134,7 @@ async def event_wait(event: asyncio.Event, timeout: int) -> bool:
 async def print_stats(period: int) -> None:
     """Periodically print information about how much data is flowing from Firehose."""
     # pylint: disable=global-statement
-    global LINES_READ, BYTES_READ
+    global lines_read, bytes_read
 
     total_lines = 0
     total_bytes = 0
@@ -145,19 +149,19 @@ async def print_stats(period: int) -> None:
         period_seconds = now - last_seconds
         if first_pitr:
             if total_seconds:
-                catchup_rate = (int(LAST_GOOD_PITR) - int(first_pitr)) / total_seconds
+                catchup_rate = (int(last_good_pitr) - int(first_pitr)) / total_seconds
             else:
                 catchup_rate = 0
         else:
-            first_pitr = LAST_GOOD_PITR
+            first_pitr = last_good_pitr
         last_seconds = now
         async with STATS_LOCK:
-            total_lines += LINES_READ
-            total_bytes += BYTES_READ
+            total_lines += lines_read
+            total_bytes += bytes_read
             if period_seconds:
                 print(
-                    f"Period messages/s {LINES_READ / period_seconds:>5.0f}, \
-                    period bytes/s {BYTES_READ / period_seconds:>5.0f}"
+                    f"Period messages/s {lines_read / period_seconds:>5.0f}, \
+                    period bytes/s {bytes_read / period_seconds:>5.0f}"
                 )
             if total_seconds:
                 print(
@@ -168,8 +172,8 @@ async def print_stats(period: int) -> None:
                 print(f"Total catchup rate: {catchup_rate:.2f}x")
             print(f"Total messages received: {total_lines}")
             print()
-            LINES_READ = 0
-            BYTES_READ = 0
+            lines_read = 0
+            bytes_read = 0
 
 
 async def read_firehose(time_mode: str) -> Optional[str]:
@@ -185,7 +189,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     "pitr <pitr>" where <pitr> is a value previously returned by this function
     """
     # pylint: disable=global-statement
-    global LAST_GOOD_PITR, LINES_READ, BYTES_READ
+    global last_good_pitr, lines_read, bytes_read
 
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -216,11 +220,11 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             print(f'Error: {message["error_msg"]}')
             break
 
-        LAST_GOOD_PITR = pitr = message["pitr"]
+        last_good_pitr = pitr = message["pitr"]
 
         async with STATS_LOCK:
-            LINES_READ += 1
-            BYTES_READ += len(line)
+            lines_read += 1
+            bytes_read += len(line)
 
         PRODUCER.send(os.getenv("KAFKA_TOPIC_NAME"), line)
         PRODUCER.flush()
@@ -233,7 +237,7 @@ async def main():
     """Connect to Firehose and write the output to kafka
     """
     # pylint: disable=global-statement
-    global PRODUCER, STATS_LOCK, FINISHED, LAST_GOOD_PITR, LISTEN_PORT
+    global PRODUCER, STATS_LOCK, FINISHED, last_good_pitr, LISTEN_PORT
 
     PRODUCER = None
     while PRODUCER is None:
@@ -245,7 +249,7 @@ async def main():
 
     STATS_LOCK = asyncio.Lock()
     FINISHED = asyncio.Event()
-    LAST_GOOD_PITR = None
+    last_good_pitr = None
     LISTEN_PORT = 1601
 
     parse_script_args()

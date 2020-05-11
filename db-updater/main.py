@@ -332,7 +332,7 @@ def main():
                 enable_auto_commit=True,
                 auto_commit_interval_ms=1000,
                 bootstrap_servers=["kafka:9092"],
-                group_id="feed1",
+                group_id=os.getenv("KAFKA_GROUP_NAME"),
             )
 
             threading.Thread(target=flush_cache, name="flush_cache", args=(ENGINE,)).start()
