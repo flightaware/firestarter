@@ -23,6 +23,7 @@ warnings.filterwarnings("ignore", message="Additional column names not matching.
 
 UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
+# pylint: disable=invalid-name
 meta = sa.MetaData()
 flights = sa.Table(
     "flights",
@@ -146,7 +147,6 @@ def insert_or_update(data: dict) -> None:
         cache[converted["id"]].update(converted)
 
 
-# pylint: disable=inconsistent-return-statements
 def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
     """Splits a sequence into separate sequences of equal size (besides the last)
 
@@ -160,10 +160,10 @@ def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
         for group in zip_longest(*args):
             yield takewhile(lambda x: x is not None, group)
     else:
-        return [values]
+        yield from [values]
 
 
-def flush_cache(engine: sa.engine) -> None:
+def flush_cache() -> None:
     """Add flights into the database"""
     while not finished.is_set():
         finished.wait(2)
@@ -221,14 +221,14 @@ def flush_cache(engine: sa.engine) -> None:
             cache.clear()
 
 
-def expire_old_flights(engine: sa.engine) -> None:
+def expire_old_flights() -> None:
     """Wrapper for _expire_old_flights"""
     while not finished.is_set():
         finished.wait(60)
-        _expire_old_flights(engine)
+        _expire_old_flights()
 
 
-def _expire_old_flights(engine: sa.engine) -> None:
+def _expire_old_flights() -> None:
     """Remove flights from the database if they have not been updated in 48 hours"""
     dropoff = datetime.now(tz=UTC) - timedelta(hours=48)
     dtmin = datetime.min.replace(tzinfo=UTC)
@@ -291,7 +291,7 @@ def process_keepalive_message(data: dict) -> None:
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
 
 
-def setup_sqlite(engine: sa.engine) -> None:
+def setup_sqlite() -> None:
     """Set proper sqlite configurations"""
 
     # WAL mode allows reading the db while it's being written to
@@ -309,10 +309,10 @@ def setup_sqlite(engine: sa.engine) -> None:
 def main():
     """Read flight updates from kafka and store them into the database"""
     if engine.name == "sqlite":
-        setup_sqlite(engine)
+        setup_sqlite()
     if engine.has_table("flights"):
         print("flights table already exists, clearing expired flights before continuing")
-        _expire_old_flights(engine)
+        _expire_old_flights()
     meta.create_all(engine)
 
     processor_functions = {
@@ -337,8 +337,8 @@ def main():
                 group_id=os.getenv("KAFKA_GROUP_NAME"),
             )
 
-            threading.Thread(target=flush_cache, name="flush_cache", args=(engine,)).start()
-            threading.Thread(target=expire_old_flights, name="expire", args=(engine,)).start()
+            threading.Thread(target=flush_cache, name="flush_cache", args=()).start()
+            threading.Thread(target=expire_old_flights, name="expire", args=()).start()
             for msg in consumer:
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
