@@ -24,9 +24,11 @@ COPY --chown=firestarter fids/requirements ./requirements
 COPY --chown=firestarter fids/app.py .
 COPY --chown=firestarter fids/Makefile .
 
-RUN make docker-setup
-
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=development
-ENTRYPOINT ["venv/bin/python3"]
-CMD ["app.py"]
+
+RUN make docker-setup
+ENV VIRTUAL_ENV=./venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+CMD ["python3", "app.py"]

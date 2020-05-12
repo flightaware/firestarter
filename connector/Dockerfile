@@ -14,7 +14,8 @@ COPY --chown=firestarter connector/main.py .
 COPY --chown=firestarter connector/Makefile .
 
 RUN make docker-setup
+ENV VIRTUAL_ENV=./venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-ENTRYPOINT ["venv/bin/python3"]
-CMD ["main.py"]
+CMD ["python3", "main.py"]
 
