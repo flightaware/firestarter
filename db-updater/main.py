@@ -146,6 +146,7 @@ def insert_or_update(data: dict) -> None:
         CACHE[converted["id"]].update(converted)
 
 
+# pylint: disable=inconsistent-return-statements
 def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
     """Splits a sequence into separate sequences of equal size (besides the last)
 
@@ -158,7 +159,8 @@ def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
         # Prevent padding behavior of zip_longest
         for group in zip_longest(*args):
             yield takewhile(lambda x: x is not None, group)
-    return [values]
+    else:
+        return [values]
 
 
 def flush_cache(engine: sa.engine) -> None:
@@ -340,7 +342,7 @@ def main():
             for msg in consumer:
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
-            print("Got EOF from kafka, quitting")
+            print("Disconneted from kafka, quitting")
             break
         except (OSError, NoBrokersAvailable) as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
