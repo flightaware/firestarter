@@ -8,6 +8,7 @@ from flask import Flask, request, jsonify, abort, render_template, Response
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 
+# pylint: disable=invalid-name
 engine = sa.create_engine(os.getenv("DB_URL"), echo=True)
 meta = sa.MetaData()
 insp = sa.inspect(engine)
