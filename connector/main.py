@@ -12,6 +12,8 @@ from typing import Optional, Tuple
 from kafka import KafkaProducer  # type: ignore
 from kafka.errors import NoBrokersAvailable  # type: ignore
 
+CONNECTION_ERROR_LIMIT = 3
+
 COMPRESSION: str
 USERNAME: Optional[str]
 APIKEY: Optional[str]
@@ -257,7 +259,6 @@ async def main():
     stats_task = None
     if STATS_PERIOD:
         stats_task = asyncio.create_task(print_stats(STATS_PERIOD))
-    connection_error_limit = 3
     errors = 0
     time_mode = INIT_CMD_TIME
     while True:
@@ -266,12 +267,12 @@ async def main():
             time_mode = f"pitr {pitr}"
             print(f'Reconnecting with "{time_mode}"')
             errors = 0
-        elif errors < connection_error_limit - 1:
+        elif errors < CONNECTION_ERROR_LIMIT - 1:
             print(f'Previous connection never got a pitr, trying again with "{time_mode}"')
             errors += 1
         else:
             print(
-                f"Connection failed {connection_error_limit} \
+                f"Connection failed {CONNECTION_ERROR_LIMIT} \
                 times before getting a non-error message, quitting"
             )
             break
