@@ -7,8 +7,8 @@ WORKDIR /home/firestarter
 
 COPY --chown=firestarter Makefile.inc .
 
-RUN mkdir db-updater
-WORKDIR /home/firestarter/db-updater
+RUN mkdir app
+WORKDIR /home/firestarter/app
 RUN mkdir db
 COPY --chown=firestarter db-updater/requirements ./requirements
 COPY --chown=firestarter db-updater/main.py .

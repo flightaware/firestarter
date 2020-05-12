@@ -7,8 +7,8 @@ WORKDIR /home/firestarter
 
 COPY --chown=firestarter Makefile.inc .
 
-RUN mkdir connector
-WORKDIR /home/firestarter/connector
+RUN mkdir app
+WORKDIR /home/firestarter/app
 COPY --chown=firestarter connector/requirements ./requirements
 COPY --chown=firestarter connector/main.py .
 COPY --chown=firestarter connector/Makefile .

@@ -72,7 +72,7 @@ services:
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=group1
     volumes:
-      - data:/home/firestarter/db-updater/db
+      - data:/home/firestarter/app/db
     logging:
       driver: "json-file"
       options:
@@ -96,7 +96,7 @@ services:
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
     volumes:
-      - data:/home/firestarter/fids/db
+      - data:/home/firestarter/app/db
     logging:
       driver: "json-file"
       options:

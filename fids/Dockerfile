@@ -9,8 +9,8 @@ WORKDIR /home/firestarter
 
 COPY --chown=firestarter Makefile.inc .
 
-RUN mkdir fids
-WORKDIR /home/firestarter/fids
+RUN mkdir app
+WORKDIR /home/firestarter/app
 
 COPY --chown=firestarter fids/frontend/client frontend
 RUN cd frontend && \
