@@ -126,6 +126,7 @@ def airport_departures(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
+# pylint: disable=singleton-comparison
 @APP.route("/airports/<airport>/enroute")
 @APP.route("/airports/<airport>/scheduledto")
 def airport_enroute(airport: str) -> Response:
@@ -139,7 +140,7 @@ def airport_enroute(airport: str) -> Response:
                 FLIGHTS.c.destination == airport,
                 FLIGHTS.c.flight_number != "BLOCKED",
                 func.coalesce(FLIGHTS.c.actual_in, FLIGHTS.c.actual_on, FLIGHTS.c.cancelled)
-                is None,
+                == None,
                 FLIGHTS.c.estimated_on.between(past_dropoff, future_dropoff),
             )
         )
@@ -162,13 +163,13 @@ def airport_scheduled(airport: str) -> Response:
                 FLIGHTS.c.origin == airport,
                 FLIGHTS.c.flight_number != "BLOCKED",
                 or_(
-                    func.coalesce(FLIGHTS.c.actual_out, FLIGHTS.c.actual_off) is None,
+                    func.coalesce(FLIGHTS.c.actual_out, FLIGHTS.c.actual_off) == None,
                     # You can actually get true_cancel'ed flights with an actual_out/off. Weird?
                     FLIGHTS.c.true_cancel,
                 ),
                 FLIGHTS.c.filed_off.between(past_dropoff, future_dropoff),
                 or_(
-                    FLIGHTS.c.cancelled is None,
+                    FLIGHTS.c.cancelled == None,
                     and_(FLIGHTS.c.true_cancel, FLIGHTS.c.cancelled > past_dropoff),
                 ),
             )
