@@ -23,14 +23,11 @@ INIT_CMD_TIME: str
 SERVERNAME: str
 STATS_PERIOD: int
 
-STATS_LOCK: asyncio.Lock
-FINISHED: asyncio.Event
-
-LISTEN_PORT: int
-
-PRODUCER: KafkaProducer
-
 # pylint: disable=invalid-name
+stats_lock: asyncio.Lock
+finished: asyncio.Event
+producer: KafkaProducer
+
 lines_read: int = 0
 bytes_read: int = 0
 last_good_pitr: Optional[int]
@@ -144,8 +141,8 @@ async def print_stats(period: int) -> None:
     last_seconds = initial_seconds
     first_pitr = None
     catchup_rate = 0
-    while not FINISHED.is_set():
-        await event_wait(FINISHED, period)
+    while not finished.is_set():
+        await event_wait(finished, period)
         now = time.monotonic()
         total_seconds = now - initial_seconds
         period_seconds = now - last_seconds
@@ -157,7 +154,7 @@ async def print_stats(period: int) -> None:
         else:
             first_pitr = last_good_pitr
         last_seconds = now
-        async with STATS_LOCK:
+        async with stats_lock:
             total_lines += lines_read
             total_bytes += bytes_read
             if period_seconds:
@@ -224,12 +221,12 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
         last_good_pitr = pitr = message["pitr"]
 
-        async with STATS_LOCK:
+        async with stats_lock:
             lines_read += 1
             bytes_read += len(line)
 
-        PRODUCER.send(os.getenv("KAFKA_TOPIC_NAME"), line)
-        PRODUCER.flush()
+        producer.send(os.getenv("KAFKA_TOPIC_NAME"), line)
+        producer.flush()
 
     # We'll only reach this point if something's wrong with the connection.
     return pitr
@@ -239,20 +236,19 @@ async def main():
     """Connect to Firehose and write the output to kafka
     """
     # pylint: disable=global-statement
-    global PRODUCER, STATS_LOCK, FINISHED, last_good_pitr, LISTEN_PORT
+    global producer, stats_lock, finished, last_good_pitr
 
-    PRODUCER = None
-    while PRODUCER is None:
+    producer = None
+    while producer is None:
         try:
-            PRODUCER = KafkaProducer(bootstrap_servers=["kafka:9092"])
+            producer = KafkaProducer(bootstrap_servers=["kafka:9092"])
         except NoBrokersAvailable as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
 
-    STATS_LOCK = asyncio.Lock()
-    FINISHED = asyncio.Event()
+    stats_lock = asyncio.Lock()
+    finished = asyncio.Event()
     last_good_pitr = None
-    LISTEN_PORT = 1601
 
     parse_script_args()
 
@@ -279,7 +275,7 @@ async def main():
 
     if stats_task:
         print("Dumping stats one last time...")
-        FINISHED.set()
+        finished.set()
         await stats_task
 
 

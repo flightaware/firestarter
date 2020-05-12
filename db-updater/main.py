@@ -23,10 +23,10 @@ warnings.filterwarnings("ignore", message="Additional column names not matching.
 
 UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
-META = sa.MetaData()
-FLIGHTS = sa.Table(
+meta = sa.MetaData()
+flights = sa.Table(
     "flights",
-    META,
+    meta,
     sa.Column("id", sa.String, primary_key=True),
     sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
     sa.Column(
@@ -89,34 +89,34 @@ elif "sqlite" in db_url:
     # are trying to write to the database
     engine_args["connect_args"] = {"timeout": 60, "isolation_level": None}
 
-ENGINE = sa.create_engine(db_url, **engine_args)
+engine = sa.create_engine(db_url, **engine_args)
 
 # Columns in the table that we'll explicitly be setting
-MSG_TABLE_COLS = {c for c in FLIGHTS.c if c.server_default is None}
+MSG_TABLE_COLS = {c for c in flights.c if c.server_default is None}
 # The keys in a message that we want in the flights table
 MSG_TABLE_KEYS = {c.key for c in MSG_TABLE_COLS}
 
-FINISHED = threading.Event()
-CACHE_LOCK = threading.Lock()
+finished = threading.Event()
+cache_lock = threading.Lock()
 # Use a cache for accumulating flight information, flushing it to the database
 # as necessary.  It should contain full versions of flight rows (rather than
 # the sparse ones we might get if we just insert/update flights according to
 # received data) to ensure proper behavior of executemany-style SQLAlchemy
 # statements.
 # https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
-CACHE = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
+cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
 
 SQLITE_VAR_LIMIT = None
 
 
-@sa.event.listens_for(ENGINE, "begin")
+@sa.event.listens_for(engine, "begin")
 def do_begin(conn: sa.engine.Transaction) -> None:
     """emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
     error if we happen to expire flights between the flush_cache thread's
     read and write (more info about how this can occur:
     https://www.sqlite.org/rescode.html#busy_snapshot)
     """
-    if ENGINE.name != "sqlite":
+    if engine.name != "sqlite":
         return
 
     conn.execute("BEGIN IMMEDIATE")
@@ -129,7 +129,7 @@ def convert_msg_fields(msg: dict) -> dict:
     for key in msg.keys() - MSG_TABLE_KEYS:
         del msg[key]
     for key, val in msg.items():
-        column_type = str(FLIGHTS.c[key].type)
+        column_type = str(flights.c[key].type)
         if column_type == "TIMESTAMP":
             msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
         elif column_type == "INTEGER":
@@ -142,8 +142,8 @@ def convert_msg_fields(msg: dict) -> dict:
 def insert_or_update(data: dict) -> None:
     """Insert new row into the database or update an existing row"""
     converted = convert_msg_fields(data)
-    with CACHE_LOCK:
-        CACHE[converted["id"]].update(converted)
+    with cache_lock:
+        cache[converted["id"]].update(converted)
 
 
 # pylint: disable=inconsistent-return-statements
@@ -165,18 +165,18 @@ def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
 
 def flush_cache(engine: sa.engine) -> None:
     """Add flights into the database"""
-    while not FINISHED.is_set():
-        FINISHED.wait(2)
-        with CACHE_LOCK, engine.begin() as conn:
-            if not CACHE:
+    while not finished.is_set():
+        finished.wait(2)
+        with cache_lock, engine.begin() as conn:
+            if not cache:
                 continue
-            print(f"Flushing {len(CACHE)} new/updated flights to database")
+            print(f"Flushing {len(cache)} new/updated flights to database")
             if engine.name == "postgresql":
                 # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
                 # pylint: disable=import-outside-toplevel
                 from sqlalchemy.dialects.postgresql import insert  # type: ignore
 
-                statement = insert(FLIGHTS)
+                statement = insert(flights)
                 # This builds the "SET ?=?" part of the update statement,
                 # making sure to keep the row's current values if they're
                 # non-null and the new row's are null
@@ -188,19 +188,19 @@ def flush_cache(engine: sa.engine) -> None:
                 # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
                 col_updates["changed"] = func.now()
                 statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
-                conn.execute(statement, *CACHE.values())
+                conn.execute(statement, *cache.values())
             else:
                 updates = []
                 # Get all rows from database that will need updating. Parameter
                 # list is chunked as needed to prevent overrunning sqlite
                 # limits: https://www.sqlite.org/limits.html#max_variable_number
-                id_chunks = chunk(CACHE.keys(), SQLITE_VAR_LIMIT)
+                id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
                 existing = chain.from_iterable(
-                    conn.execute(select([FLIGHTS]).where(FLIGHTS.c.id.in_(keys)))
+                    conn.execute(select([flights]).where(flights.c.id.in_(keys)))
                     for keys in id_chunks
                 )
                 for flight in existing:
-                    cache_flight = CACHE.pop(flight["id"])
+                    cache_flight = cache.pop(flight["id"])
                     for k in cache_flight:
                         if cache_flight[k] is None:
                             cache_flight[k] = flight[k]
@@ -210,21 +210,21 @@ def flush_cache(engine: sa.engine) -> None:
                     updates.append(cache_flight)
                 # We removed the to-be-updated flights from the cache, so
                 # insert the rest
-                inserts = CACHE.values()
+                inserts = cache.values()
                 # pylint: disable=no-value-for-parameter
                 if updates:
                     conn.execute(
-                        FLIGHTS.update().where(FLIGHTS.c.id == bindparam("_id")), *updates,
+                        flights.update().where(flights.c.id == bindparam("_id")), *updates,
                     )
                 if inserts:
-                    conn.execute(FLIGHTS.insert(), *inserts)
-            CACHE.clear()
+                    conn.execute(flights.insert(), *inserts)
+            cache.clear()
 
 
 def expire_old_flights(engine: sa.engine) -> None:
     """Wrapper for _expire_old_flights"""
-    while not FINISHED.is_set():
-        FINISHED.wait(60)
+    while not finished.is_set():
+        finished.wait(60)
         _expire_old_flights(engine)
 
 
@@ -233,8 +233,8 @@ def _expire_old_flights(engine: sa.engine) -> None:
     dropoff = datetime.now(tz=UTC) - timedelta(hours=48)
     dtmin = datetime.min.replace(tzinfo=UTC)
     # pylint: disable=no-value-for-parameter
-    statement = FLIGHTS.delete().where(
-        and_(*(func.coalesce(c, dtmin) < dropoff for c in FLIGHTS.c if str(c.type) == "TIMESTAMP"))
+    statement = flights.delete().where(
+        and_(*(func.coalesce(c, dtmin) < dropoff for c in flights.c if str(c.type) == "TIMESTAMP"))
     )
     result = engine.execute(statement)
     if result.rowcount:
@@ -308,12 +308,12 @@ def setup_sqlite(engine: sa.engine) -> None:
 
 def main():
     """Read flight updates from kafka and store them into the database"""
-    if ENGINE.name == "sqlite":
-        setup_sqlite(ENGINE)
-    if ENGINE.has_table("flights"):
+    if engine.name == "sqlite":
+        setup_sqlite(engine)
+    if engine.has_table("flights"):
         print("flights table already exists, clearing expired flights before continuing")
-        _expire_old_flights(ENGINE)
-    META.create_all(ENGINE)
+        _expire_old_flights(engine)
+    meta.create_all(engine)
 
     processor_functions = {
         "arrival": process_arrival_message,
@@ -337,8 +337,8 @@ def main():
                 group_id=os.getenv("KAFKA_GROUP_NAME"),
             )
 
-            threading.Thread(target=flush_cache, name="flush_cache", args=(ENGINE,)).start()
-            threading.Thread(target=expire_old_flights, name="expire", args=(ENGINE,)).start()
+            threading.Thread(target=flush_cache, name="flush_cache", args=(engine,)).start()
+            threading.Thread(target=expire_old_flights, name="expire", args=(engine,)).start()
             for msg in consumer:
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
@@ -357,4 +357,4 @@ if __name__ == "__main__":
         traceback.print_exc()
         print("\nQuitting due to exception, wait a moment for cache flush to database\n")
     finally:
-        FINISHED.set()
+        finished.set()
