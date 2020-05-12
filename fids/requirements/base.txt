@@ -8,8 +8,9 @@ click==7.0 \
     --hash=sha256:2335065e6395b9e67ca716de5f7526736bfa6ceead690adf616d925bdc622b13 \
     --hash=sha256:5b94b49521f6456670fdb30cd82a4eca9412788a93fa6dd6df72c94d5a8ff2d7 \
     # via flask
-flask-cors==1.10.3 \
-    --hash=sha256:9e6927aa0a46f314bca0ec63eb871cee898a162adfdd5b65224db7a008287423 \
+flask-cors==3.0.8 \
+    --hash=sha256:72170423eb4612f0847318afff8c247b38bd516b7737adfc10d1c2cdbb382d16 \
+    --hash=sha256:f4d97201660e6bbcff2d89d082b5b6d31abee04b1b3003ee073a6fd25ad1d69a \
     # via -r base.in
 flask==1.1.2 \
     --hash=sha256:4efa1ae2d7c9865af48986de8aeb8504bf32c7f3d6fdc9353d34b21f4b127060 \
