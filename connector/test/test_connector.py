@@ -35,70 +35,65 @@ class TestReconnect(unittest.TestCase):
         if len(self.init_cmds) >= self.init_cmd_limit:
             raise EndTestNow()
 
-    def live_reconnect_after_error(self, mock_kafkaproducer, mock_openconnection, error):
+    def reconnect_after_error(self, test_reconnect_live, mock_kafkaproducer, mock_openconnection, error):
         # mock setup
-        self.mock_reader.readline.coro.side_effect = [error]
+        if test_reconnect_live:
+            self.mock_reader.readline.coro.side_effect = [error]
+        else:
+            self.mock_reader.readline.coro.side_effect = [b'{"pitr":"1584126630","type":"position"}', error]
         mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
 
         # run test
         with self.assertRaises(EndTestNow), self.env:
             pitr = asyncio.run(main.main())
 
-        # verify expected init cmds
-        self.assertEqual(self.init_cmds, [b'live username testuser password testapikey keepalive 60\n', b'live username testuser password testapikey keepalive 60\n'])
-        # verify expect output to kafka
-        mock_kafkaproducer.return_value.send.assert_not_called()
-
-    def pitr_reconnect_after_error(self, mock_kafkaproducer, mock_openconnection, error):
-        # mock setup
-        self.mock_reader.readline.coro.side_effect = [b'{"pitr":"1584126630","type":"position"}', error]
-        mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
-
-        # run test
-        with self.assertRaises(EndTestNow), self.env:
-            pitr = asyncio.run(main.main())
-
-        # verify expected init cmds
-        self.assertEqual(self.init_cmds, [b'live username testuser password testapikey keepalive 60\n', b'pitr 1584126630 username testuser password testapikey keepalive 60\n'])
-        # verify expect output to kafka
-        mock_kafkaproducer.return_value.send.assert_called_once_with('topic1', b'{"pitr":"1584126630","type":"position"}')
+        if test_reconnect_live:
+            # verify expected init cmds
+            self.assertEqual(self.init_cmds, [b'live username testuser password testapikey keepalive 60\n', b'live username testuser password testapikey keepalive 60\n'])
+            # verify expect output to kafka
+            mock_kafkaproducer.return_value.send.assert_not_called()
+        else:
+            # verify expected init cmds
+            self.assertEqual(self.init_cmds, [b'live username testuser password testapikey keepalive 60\n', b'pitr 1584126630 username testuser password testapikey keepalive 60\n'])
+            # verify expect output to kafka
+            mock_kafkaproducer.return_value.send.assert_called_once_with('topic1', b'{"pitr":"1584126630","type":"position"}')
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_pitr_eof(self, mock_kafkaproducer, mock_openconnection):
-        self.pitr_reconnect_after_error(mock_kafkaproducer, mock_openconnection, b"")
+        self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, b"")
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_live_eof(self, mock_kafkaproducer, mock_openconnection):
-        self.live_reconnect_after_error(mock_kafkaproducer, mock_openconnection, b"")
+        self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b"")
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_pitr_timeout(self, mock_kafkaproducer, mock_openconnection):
-        self.pitr_reconnect_after_error(mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError)
+        self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError)
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_live_timeout(self, mock_kafkaproducer, mock_openconnection):
-        self.live_reconnect_after_error(mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError)
+        self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError)
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_pitr_disconnect(self, mock_kafkaproducer, mock_openconnection):
-        self.pitr_reconnect_after_error(mock_kafkaproducer, mock_openconnection, AttributeError)
+        self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, AttributeError)
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_live_disconnect(self, mock_kafkaproducer, mock_openconnection):
-        self.live_reconnect_after_error(mock_kafkaproducer, mock_openconnection, AttributeError)
+        self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, AttributeError)
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_pitr_error_msg(self, mock_kafkaproducer, mock_openconnection):
-        self.pitr_reconnect_after_error(mock_kafkaproducer, mock_openconnection, b'{"pitr":"1584126630","type":"error","error_msg":"test error"}')
+        self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, b'{"pitr":"1584126630","type":"error","error_msg":"test error"}')
 
     @patch('main.open_connection', new_callable=CoroMock)
     @patch('main.KafkaProducer', new_callable=Mock)
     def test_live_error_msg(self, mock_kafkaproducer, mock_openconnection):
-        self.live_reconnect_after_error(mock_kafkaproducer, mock_openconnection, b'{"pitr":"1584126630","type":"error","error_msg":"test error"}')
+        self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b'{"pitr":"1584126630","type":"error","error_msg":"test error"}')
