@@ -337,8 +337,8 @@ def main():
                 group_id=os.getenv("KAFKA_GROUP_NAME"),
             )
 
-            threading.Thread(target=flush_cache, name="flush_cache", args=()).start()
-            threading.Thread(target=expire_old_flights, name="expire", args=()).start()
+            threading.Thread(target=flush_cache, name="flush_cache").start()
+            threading.Thread(target=expire_old_flights, name="expire").start()
             for msg in consumer:
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
