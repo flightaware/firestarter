@@ -1,0 +1,4 @@
+-c base.txt
+mypy==0.740
+black==19.10b0
+pylint==2.4.4

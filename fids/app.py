@@ -1,12 +1,14 @@
+"""Read flight information from database and display it on a webpage"""
+
 from datetime import datetime, timedelta, timezone
 import os
 import time
+from typing import Optional
+from flask import Flask, request, jsonify, abort, render_template, Response
+import sqlalchemy as sa  # type: ignore
+from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 
-from flask import Flask, request, jsonify, abort, render_template
-from flask_cors import CORS
-import sqlalchemy as sa
-from sqlalchemy.sql import union, select, func, and_, or_
-
+# pylint: disable=invalid-name
 engine = sa.create_engine(os.getenv("DB_URL"), echo=True)
 meta = sa.MetaData()
 insp = sa.inspect(engine)
@@ -16,9 +18,7 @@ while "flights" not in insp.get_table_names():
     time.sleep(3)
 flights = sa.Table("flights", meta, autoload_with=engine)
 
-app = Flask(
-    __name__, template_folder="frontend/build", static_folder="frontend/build/static"
-)
+app = Flask(__name__, template_folder="frontend/build", static_folder="frontend/build/static")
 # Uncomment to enable serving the frontend separately (when testing, perhaps)
 # CORS(app)
 
@@ -29,12 +29,15 @@ UTC = timezone.utc
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def catch_all(path):
+    """Render HTML"""
+    # pylint: disable=unused-argument
     return render_template("index.html")
 
 
 @app.route("/flights/")
 @app.route("/flights/<flight_id>")
-def get_flight(flight_id=None):
+def get_flight(flight_id: Optional[str] = None) -> dict:
+    """Get info for a specific flight_id"""
     if flight_id is None:
         # get random flight
         whereclause = flights.c.id.in_(
@@ -52,16 +55,15 @@ def get_flight(flight_id=None):
 
 
 @app.route("/airports/")
-def get_busiest_airports():
+def get_busiest_airports() -> Response:
+    """Get the busiest airport"""
     limit = request.args.get("limit", 10)
     since = datetime.fromtimestamp(int(request.args.get("since", 0)), tz=UTC)
     query = request.args.get("query")
     if query:
         result = engine.execute(
             union(
-                select([flights.c.origin])
-                .distinct()
-                .where(flights.c.origin.like(f"%{query}%")),
+                select([flights.c.origin]).distinct().where(flights.c.origin.like(f"%{query}%")),
                 select([flights.c.destination])
                 .distinct()
                 .where(flights.c.destination.like(f"%{query}%")),
@@ -70,26 +72,24 @@ def get_busiest_airports():
         if result is None:
             abort(404)
         return jsonify([row[0] for row in result])
-    else:
-        return jsonify(
-            [
-                row.origin
-                for row in engine.execute(
-                    select([flights.c.origin])
-                    .where(
-                        func.coalesce(flights.c.actual_off, flights.c.actual_out)
-                        > since
-                    )
-                    .group_by(flights.c.origin)
-                    .order_by(func.count().desc())
-                    .limit(limit)
-                )
-            ]
-        )
+
+    return jsonify(
+        [
+            row.origin
+            for row in engine.execute(
+                select([flights.c.origin])
+                .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) > since)
+                .group_by(flights.c.origin)
+                .order_by(func.count().desc())
+                .limit(limit)
+            )
+        ]
+    )
 
 
 @app.route("/airports/<airport>/arrivals")
-def airport_arrivals(airport):
+def airport_arrivals(airport: str) -> Response:
+    """Get a list of arrivals for a certain airport"""
     airport = airport.upper()
     dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     result = engine.execute(
@@ -97,10 +97,8 @@ def airport_arrivals(airport):
             and_(
                 flights.c.destination == airport,
                 flights.c.flight_number != "BLOCKED",
-                func.coalesce(flights.c.actual_out, flights.c.actual_off) != None,
-                func.coalesce(
-                    flights.c.actual_in, flights.c.actual_on, flights.c.cancelled
-                )
+                func.coalesce(flights.c.actual_out, flights.c.actual_off) is not None,
+                func.coalesce(flights.c.actual_in, flights.c.actual_on, flights.c.cancelled)
                 > dropoff,
             )
         )
@@ -111,7 +109,8 @@ def airport_arrivals(airport):
 
 
 @app.route("/airports/<airport>/departures")
-def airport_departures(airport):
+def airport_departures(airport: str) -> Response:
+    """Get a list of departures for a certain airport"""
     airport = airport.upper()
     dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     result = engine.execute(
@@ -128,9 +127,11 @@ def airport_departures(airport):
     return jsonify([dict(e) for e in result])
 
 
+# pylint: disable=singleton-comparison
 @app.route("/airports/<airport>/enroute")
 @app.route("/airports/<airport>/scheduledto")
-def airport_enroute(airport):
+def airport_enroute(airport: str) -> Response:
+    """Get a list of flights enroute to a certain airport"""
     airport = airport.upper()
     past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)
@@ -139,9 +140,7 @@ def airport_enroute(airport):
             and_(
                 flights.c.destination == airport,
                 flights.c.flight_number != "BLOCKED",
-                func.coalesce(
-                    flights.c.actual_in, flights.c.actual_on, flights.c.cancelled
-                )
+                func.coalesce(flights.c.actual_in, flights.c.actual_on, flights.c.cancelled)
                 == None,
                 flights.c.estimated_on.between(past_dropoff, future_dropoff),
             )
@@ -154,7 +153,8 @@ def airport_enroute(airport):
 
 @app.route("/airports/<airport>/scheduled")
 @app.route("/airports/<airport>/scheduledfrom")
-def airport_scheduled(airport):
+def airport_scheduled(airport: str) -> Response:
+    """Get a list of scheduled flights from a certain airport"""
     airport = airport.upper()
     past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)

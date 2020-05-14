@@ -3,7 +3,9 @@ version: '3.7'
 services:
   connector:
     image: "firestarter_connector:1.0"
-    build: ./connector
+    build:
+      context: .
+      dockerfile: connector/Dockerfile
     init: true
     networks:
       - internal
@@ -42,8 +44,9 @@ services:
       # Whether connector should immediately connect to Firehose upon starting
       # (1) or wait until its first client has connected before it connects to
       # Firehose (0).
-      - START_IMMEDIATELY=${START_IMMEDIATELY:-0}
       - PYTHONUNBUFFERED=1
+      # Each consumer should have its own unique kafka topic name
+      - KAFKA_TOPIC_NAME=feed1
     logging:
       driver: "json-file"
       options:
@@ -52,7 +55,9 @@ services:
 
   db-updater:
     image: "firestarter_db-updater:1.0"
-    build: ./db-updater
+    build:
+      context: .
+      dockerfile: db-updater/Dockerfile
     init: true
     networks:
       - internal
@@ -61,8 +66,13 @@ services:
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
+      # Same kafka topic name as the producer of the feed that you want to consume
+      - KAFKA_TOPIC_NAME=feed1
+      # Consumers with the same group name will split the data between them,
+      # but consumers with different group names will each receive all of the messages 
+      - KAFKA_GROUP_NAME=group1
     volumes:
-      - data:/home/firestarter/db
+      - data:/home/firestarter/app/db
     logging:
       driver: "json-file"
       options:
@@ -71,7 +81,9 @@ services:
 
   fids:
     image: "firestarter_fids:1.0"
-    build: ./fids
+    build:
+      context: .
+      dockerfile: fids/Dockerfile
     init: true
     ports:
       # Port upon which to serve webapp
@@ -84,15 +96,47 @@ services:
       - DB_URL=${DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
     volumes:
-      - data:/home/firestarter/db
+      - data:/home/firestarter/app/db
     logging:
       driver: "json-file"
       options:
         max-size: "10mb"
         max-file: "5"
 
+  zookeeper:
+    image: "bitnami/zookeeper:3.6.0"
+    init: true
+    ports:
+      - "2181:2181"
+    networks:
+      - internal
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper_data:/bitnami/zookeeper
+
+  kafka:
+    image: "bitnami/kafka:2.5.0"
+    init: true
+    ports:
+      - "9092:9092"
+    networks:
+      - internal
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      # Retain messages for 1 hour
+      - KAFKA_CFG_LOG_RETENTION_HOURS=1
+    volumes:
+      - kafka_data:/bitnami/kafka
+    depends_on:
+      - zookeeper
+
+
 volumes:
   data:
+  kafka_data:
+  zookeeper_data:
 
 networks:
   internal:
