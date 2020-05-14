@@ -27,7 +27,10 @@ lint:
 
 check: lint type-check
 
+test: 
+	. venv/bin/activate && $(PYTHON) -m unittest discover -s test
+
 run:
 	docker-compose -f ../docker-compose.yml up --build $(PROGNAME)
 
-.PHONY: venv pip-compile pip-sync docker-setup type-check format lint check run
+.PHONY: venv pip-compile pip-sync docker-setup type-check format lint check test run
