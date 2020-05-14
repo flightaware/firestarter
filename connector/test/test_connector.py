@@ -6,20 +6,11 @@ import unittest
 from unittest.mock import patch, Mock
 import main
 
-def async_test(coro):
-    def wrapper(*args, **kwargs):
-        loop = asyncio.new_event_loop()
-        return loop.run_until_complete(coro(*args, **kwargs))
-    return wrapper
-
-# monkey patch MagicMock
-async def async_magic():
-    pass
-
-Mock.__await__ = lambda x: async_magic().__await__()
-
-async def resolve(val):
-    return val
+def CoroMock():
+    coro = Mock(name="CoroutineResult")
+    corofunc = Mock(name="CoroutineFunction", side_effect=asyncio.coroutine(coro))
+    corofunc.coro = coro
+    return corofunc
 
 class EndTestNow(Exception):
     pass
@@ -28,31 +19,35 @@ class TestReconnect(unittest.TestCase):
     def setUp(self):
         self.init_cmd_limit = 2
         self.init_cmds = []
-        self.env = patch.dict('os.environ', {'COMPRESSION':'', 'FH_USERNAME': 'testuser', 'FH_APIKEY': 'testapikey', 'KEEPALIVE': '60', 'INIT_CMD_ARGS': '', 'INIT_CMD_TIME': 'live', 'SERVER': 'testserver', 'PRINT_STATS_PERIOD': '0'})
+        self.env = patch.dict('os.environ', {'COMPRESSION':'', 'FH_USERNAME': 'testuser', 'FH_APIKEY': 'testapikey', 'KEEPALIVE': '60', 'INIT_CMD_ARGS': '', 'INIT_CMD_TIME': 'live', 'SERVER': 'testserver', 'PRINT_STATS_PERIOD': '0', 'KAFKA_TOPIC_NAME': 'topic1'})
+        self.mock_reader = Mock()
+        self.mock_reader.readline = CoroMock()
+        self.mock_writer = Mock()
+        self.mock_writer.drain = CoroMock()
+        self.mock_writer.write.side_effect = self.save_init_cmd_stop_test
 
     def tearDown(self):
         pass
 
     def save_init_cmd_stop_test(self, init_cmd):
-        print("HERE")
         self.init_cmds.append(init_cmd)
 
         if len(self.init_cmds) >= self.init_cmd_limit:
-            raise EndTestNow('Testing')
+            raise EndTestNow()
 
-    def printhere(test):
-        print("I AM HERE")
+    @patch('main.open_connection', new_callable=CoroMock)
+    @patch('main.KafkaProducer', new_callable=Mock)
+    def test_eof(self, mock_kafkaproducer, mock_openconnection):
+        # mock setup
+        self.mock_reader.readline.coro.side_effect = [b'{"pitr":"1584126630","type":"position"}', b""]
+        mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
 
-    @patch('main.open_connection')
-    @patch('main.KafkaProducer')
-    def test_eof(self, mock_KafkaProducer, mock_connection):
-        mock_reader = Mock()
-        mock_writer = Mock()
-        mock_reader.readline.side_effect = [resolve(b'{"pitr":"1584126630","type":"position"}'), resolve(b"")]
-        mock_writer.write.side_effect = self.save_init_cmd_stop_test
-        mock_connection.side_effect = [resolve([mock_reader, mock_writer]), resolve([mock_reader, mock_writer])]
-        #mock_connection.side_effect = self.printhere
+        # run test
         with self.assertRaises(EndTestNow), self.env:
             pitr = asyncio.run(main.main())
 
+        # verify expected init cmds
         self.assertEqual(self.init_cmds, [b'live username testuser password testapikey keepalive 60\n', b'pitr 1584126630 username testuser password testapikey keepalive 60\n'])
+        # verify expect output to kafka
+        mock_kafkaproducer.return_value.send.assert_called_once_with('topic1', b'{"pitr":"1584126630","type":"position"}')
+
