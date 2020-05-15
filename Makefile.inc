@@ -14,6 +14,10 @@ pip-compile: venv
 pip-sync: venv pip-compile
 	. venv/bin/activate && venv/bin/pip-sync $(wildcard requirements/*.txt)
 
+pip-sync-travis:
+	make -C requirements all
+	pip-sync $(wildcard requirements/*.txt)
+
 docker-setup: venv pip-sync
 
 type-check:
@@ -29,6 +33,9 @@ check: lint type-check
 
 test: 
 	. venv/bin/activate && $(PYTHON) -m unittest discover -s test
+
+test-travis: 
+	$(PYTHON) -m unittest discover -s test
 
 run:
 	docker-compose -f ../docker-compose.yml up --build $(PROGNAME)

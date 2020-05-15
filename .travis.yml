@@ -2,8 +2,8 @@ language: python
 env:
   global:
     - KEEPALIVE=60
-    - INIT_CMD_ARGS=events "flightplan"
-    - INIT_CMD_TIME= pitr 1584126630
+    - INIT_CMD_ARGS="events \"flightplan\""
+    - INIT_CMD_TIME="pitr 1584126630"
     - SERVER=firehose-test.flightaware.com
     - PRINT_STATS_PERIOD=0
     - KAFKA_TOPIC_NAME=topic1
@@ -13,7 +13,6 @@ python:
 - '3.7'
 install:
 - cd connector
-- python3 -m pip install pip-tools
-- make pip-sync
+- make pip-sync-travis
 script:
-- make test
+- make test-travis
