@@ -1,6 +1,7 @@
 import sys
 import os
 import asyncio
+import warnings
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from unittest.mock import patch, Mock
@@ -103,9 +104,9 @@ class TestCompression(unittest.TestCase):
     def setUp(self):
         self.emitted_msg = []
         self.save_main_open_connection = main.open_connection
+        warnings.simplefilter('ignore', category=ResourceWarning)
 
-    async def asyncTearDown(self):
-        await asyncio.sleep(0.250)
+    def tearDown(self):
         self.fh_writer.close()
 
     async def wrap_open_connection(self, *args, **kwargs):
