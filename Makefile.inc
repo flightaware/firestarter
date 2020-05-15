@@ -15,6 +15,7 @@ pip-sync: venv pip-compile
 	. venv/bin/activate && venv/bin/pip-sync $(wildcard requirements/*.txt)
 
 pip-sync-travis:
+	$(PYTHON) -m pip install pip-tools
 	make -C requirements all
 	pip-sync $(wildcard requirements/*.txt)
 
