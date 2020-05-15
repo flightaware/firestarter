@@ -105,8 +105,8 @@ class TestCompression(unittest.TestCase):
         self.save_main_open_connection = main.open_connection
 
     async def asyncTearDown(self):
-        await asyncio.sleep(0)
         self.fh_writer.close()
+        await asyncio.sleep(0)
 
     async def wrap_open_connection(self, *args, **kwargs):
         self.fh_reader, self.fh_writer = await self.save_main_open_connection(*args, **kwargs)
