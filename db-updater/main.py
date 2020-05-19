@@ -170,55 +170,58 @@ def flush_cache() -> None:
         with cache_lock, engine.begin() as conn:
             if not cache:
                 continue
-            print(f"Flushing {len(cache)} new/updated flights to database")
-            if engine.name == "postgresql":
-                # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
-                # pylint: disable=import-outside-toplevel
-                from sqlalchemy.dialects.postgresql import insert  # type: ignore
+            _flush_cache(conn)
 
-                statement = insert(flights)
-                # This builds the "SET ?=?" part of the update statement,
-                # making sure to keep the row's current values if they're
-                # non-null and the new row's are null
-                col_updates = {
-                    c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS
-                }
-                # on_conflict_do_update won't handle Columns with onupdate set.
-                # Have to do it ourselves.
-                # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
-                col_updates["changed"] = func.now()
-                statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
-                conn.execute(statement, *cache.values())
-            else:
-                updates = []
-                # Get all rows from database that will need updating. Parameter
-                # list is chunked as needed to prevent overrunning sqlite
-                # limits: https://www.sqlite.org/limits.html#max_variable_number
-                id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
-                existing = chain.from_iterable(
-                    conn.execute(select([flights]).where(flights.c.id.in_(keys)))
-                    for keys in id_chunks
+def _flush_cache(conn) -> None:
+        print(f"Flushing {len(cache)} new/updated flights to database")
+        if engine.name == "postgresql":
+            # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
+            # pylint: disable=import-outside-toplevel
+            from sqlalchemy.dialects.postgresql import insert  # type: ignore
+
+            statement = insert(flights)
+            # This builds the "SET ?=?" part of the update statement,
+            # making sure to keep the row's current values if they're
+            # non-null and the new row's are null
+            col_updates = {
+                c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS
+            }
+            # on_conflict_do_update won't handle Columns with onupdate set.
+            # Have to do it ourselves.
+            # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
+            col_updates["changed"] = func.now()
+            statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
+            conn.execute(statement, *cache.values())
+        else:
+            updates = []
+            # Get all rows from database that will need updating. Parameter
+            # list is chunked as needed to prevent overrunning sqlite
+            # limits: https://www.sqlite.org/limits.html#max_variable_number
+            id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
+            existing = chain.from_iterable(
+                conn.execute(select([flights]).where(flights.c.id.in_(keys)))
+                for keys in id_chunks
+            )
+            for flight in existing:
+                cache_flight = cache.pop(flight["id"])
+                for k in cache_flight:
+                    if cache_flight[k] is None:
+                        cache_flight[k] = flight[k]
+                # SQLAlchemy reserves column names in bindparam (used
+                # below) for itself, so we need to rename this
+                cache_flight["_id"] = cache_flight.pop("id")
+                updates.append(cache_flight)
+            # We removed the to-be-updated flights from the cache, so
+            # insert the rest
+            inserts = cache.values()
+            # pylint: disable=no-value-for-parameter
+            if updates:
+                conn.execute(
+                    flights.update().where(flights.c.id == bindparam("_id")), *updates,
                 )
-                for flight in existing:
-                    cache_flight = cache.pop(flight["id"])
-                    for k in cache_flight:
-                        if cache_flight[k] is None:
-                            cache_flight[k] = flight[k]
-                    # SQLAlchemy reserves column names in bindparam (used
-                    # below) for itself, so we need to rename this
-                    cache_flight["_id"] = cache_flight.pop("id")
-                    updates.append(cache_flight)
-                # We removed the to-be-updated flights from the cache, so
-                # insert the rest
-                inserts = cache.values()
-                # pylint: disable=no-value-for-parameter
-                if updates:
-                    conn.execute(
-                        flights.update().where(flights.c.id == bindparam("_id")), *updates,
-                    )
-                if inserts:
-                    conn.execute(flights.insert(), *inserts)
-            cache.clear()
+            if inserts:
+                conn.execute(flights.insert(), *inserts)
+        cache.clear()
 
 
 def expire_old_flights() -> None:
