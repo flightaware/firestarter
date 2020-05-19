@@ -14,13 +14,17 @@ env:
 
 jobs:
   include:
-  - stage: Unit-tests
+  - stage: Connector
     install:
     - cd connector
     - make pip-sync-travis
+
+  - stage: Db-updater
     install:
     - cd db-updater
     - make pip-sync-travis
+
+  - stage: Fids
     install:
     - cd fids
     - make pip-sync-travis
