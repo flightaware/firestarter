@@ -1,5 +1,6 @@
 language: python
 python: '3.7'
+script: make test-travis
 env:
   global:
     - KEEPALIVE=60
@@ -13,12 +14,18 @@ env:
 
 jobs:
   include:
-    script:
-    - cd connector && make pip-sync-travis && make test-travis
+  - stage: Connector
+    install:
+    - cd connector
+    - make pip-sync-travis
 
-    script:
-    - cd ../db-updater && make pip-sync-travis && make test-travis
+  - stage: Db-updater
+    install:
+    - cd db-updater
+    - make pip-sync-travis
 
-    script:
-    - cd ../fids && make pip-sync-travis && make test-travis
+  - stage: Fids
+    install:
+    - cd fids
+    - make pip-sync-travis
     
