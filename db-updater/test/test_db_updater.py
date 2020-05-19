@@ -10,9 +10,6 @@ env = patch.dict('os.environ', {'DB_URL':'sqlite:///db/flights.db'})
 with env:
 	import main
 
-class EndTestNow(Exception):
-    pass
-
 class TestInsertAndExpire(unittest.TestCase):
     msgs = [type('', (), {"value": b'{"type": "keepalive", "serverTime": "1589808417", "pitr": "1589808413"}'}),
         type('', (), {"value": b'{"pitr": "1589549426", "type": "flightplan", "ident": "CGEYQ", "aircrafttype": "C177", "alt": "6000", "dest": "CYQI", "edt": "1589549400", "eta": "1589552338", "facility_hash": "81E755935A704D47", "facility_name": "", "fdt": "1589548500", "id": "CGEYQ-1589545563-3-1-67", "orig": "CYZX", "predicted_off": "1589549400", "predicted_on": "1589552338", "reg": "CGEYQ", "route": "CYZX..YZX..MUXEL..OMTIV..CYQI", "speed": "112", "status": "F", "waypoints": [{"lat": 44.98, "lon": -64.92}, {"lat": 44.92, "lon": -65.1}, {"lat": 44.89, "lon": -65.18}, {"lat": 44.84, "lon": -65.28}, {"lat": 44.67, "lon": -65.62}, {"lat": 44.48, "lon": -65.88}, {"lat": 44.15, "lon": -65.98}, {"lat": 44.08, "lon": -66.01}, {"lat": 43.9, "lon": -66.06}, {"lat": 43.83, "lon": -66.09}], "ete": "2938"}'}),
