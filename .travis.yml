@@ -16,7 +16,7 @@ before_install:
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
 install:
-  - docker-compose up -d --build
+  - docker-compose up --build
   - docker ps
 before_script:
   - python3 -m pip install webdriver-manager
