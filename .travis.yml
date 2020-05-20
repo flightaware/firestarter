@@ -19,7 +19,7 @@ install:
   - docker-compose up -d --build
   - docker ps
 before_script:
-  - python3 -m pip install chromedriver-py
+  - python3 -m pip install webdriver-manager
   - python3 -m pip install selenium
 script:
   - python3 travis_ping_frontend.py
