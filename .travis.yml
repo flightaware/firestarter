@@ -1,3 +1,4 @@
+language: python
 node_js: '12.16.3'
 python: '3.7'
 services:
