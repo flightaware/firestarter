@@ -1,7 +1,7 @@
 from selenium import webdriver
 import time
 
-driver = webdriver.PhantomJS()
+driver = webdriver.Chrome()  
 driver.get('http://localhost:5000/')
 time.sleep(30)
 page_output = driver.page_source
