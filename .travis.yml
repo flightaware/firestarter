@@ -4,7 +4,7 @@ services:
   - docker
 env:
   global:
-    - DOCKER_COMPOSE_VERSION=1.4.2
+    - DOCKER_COMPOSE_VERSION=1.25.4
     - KEEPALIVE=60
     - INIT_CMD_ARGS="events \"flightplan\""
     - secure: nZUYhl/rSf6GatJ8T5uHaBPlzOLVkn7FElFLTW2oXuWP5Antad1/sZCQmVspR16I+tycLyMRQh7BD8zoRwqs2MhBafcrzcNZ31wNekJqjrERc6C5iHWRx3/DpoTFliv2LU7xDj6L2kDw/CcYyq774JsghzACPUpfjXl/1qRoBxi+Byucl+tjJUNiSmWD3VWoHIjjAuSWUBvre8/OGCab4YkZyfQI6xjlCfchJqr9s+gl7EU89XYcwO8yhPic8R1tuH99olnS5CHaAxPU0IKNsYWH59hGcBTgdYPzN9CbGH3foZh4nvgnc7i8xC6bbNVlH429Qv7Pg+3Aa8gwoJXjSgOdBW8A0g3LKtso+35mZskPQbVCr0ySGhhOs1vxHoprmJoTlN6HEXOOpb9PedvSumUCckQ9z/jAtwL6XCTv8dtP4fAljkK6CovDdlChMs0eY1r/skO8hj2PZ16YhJCqMK2fRDApGMP7SmNOM+pvNZoxV9w1PakXy3roQHCMrgwT9IqZPRB8N1w2DD9Q+OPuSEnIu9xvjzYtiNkdkR4u3SJ5xIIjK+0qjiRSMYxk2CZ0KYey0V5EVzBC6T96T8R9j+VVX2i4WvHKTQOZtjFHRbbJ21fcvXxEV1an1aLx93ND6EYEq9ewNxtOriUXeObJS/btMC4LBqHqx+hO6pBpOTU=
@@ -20,4 +20,5 @@ install:
 before_script:
   - npm -g install phantomjs-prebuilt
   - pip install selenium
+script:
   - python3 travis_ping_frontend.py
