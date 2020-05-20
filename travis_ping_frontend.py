@@ -4,6 +4,8 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
+time.sleep(30)
+
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.binary_location = '/usr/bin/google-chrome'
