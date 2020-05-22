@@ -1,10 +1,12 @@
 import os
+import re
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
-time.sleep(30)
+class NoAirportsFound(Exception):
+    pass
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -14,5 +16,13 @@ driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(),   chr
 driver.get('http://localhost:5000/')
 time.sleep(30)
 page_output = driver.page_source
-print(page_output)
+
+p = re.compile("airport-list-link.*?>([A-Z]{4})")
+airports = r.findall(page_output)
+
+if len(airports) > 0:
+	print(airports)
+else:
+	raise NoAirportsFound()
+
 driver.quit()
