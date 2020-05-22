@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/flightaware/firestarter.svg?branch=master)](https://travis-ci.org/flightaware/firestarter)
 # Firestarter - Getting started with FlightAware Firehose
 Firestarter is a small collection of services and sample applications to help
 you get started using [FlightAware's Firehose Flight Data Feed](https://flightaware.com/commercial/firehose/documentation).
