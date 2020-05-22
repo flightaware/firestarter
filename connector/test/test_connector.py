@@ -100,6 +100,8 @@ class TestReconnect(unittest.TestCase):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b'{"pitr":"1584126630","type":"error","error_msg":"test error"}')
 
 
+#THIS TEST WILL ONLY RUN IN TRAVIS
+@unittest.skipIf(not os.getenv("FH_APIKEY"), "No login credentials")
 class TestCompression(unittest.TestCase):
     def setUp(self):
         self.emitted_msg = []
