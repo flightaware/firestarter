@@ -18,7 +18,7 @@ time.sleep(30)
 page_output = driver.page_source
 
 p = re.compile("airport-list-link.*?>([A-Z]{4})")
-airports = r.findall(page_output)
+airports = p.findall(page_output)
 
 if len(airports) > 0:
 	print(airports)
