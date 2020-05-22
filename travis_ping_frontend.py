@@ -18,8 +18,6 @@ driver = webdriver.Chrome(executable_path=ChromeDriverManager().install(),   chr
 driver.get('http://localhost:5000/')
 page_output = driver.page_source
 
-print(page_output)
-
 p = re.compile("airport-list-link.*?>([A-Z]{4})")
 airports = p.findall(page_output)
 
