@@ -5,7 +5,6 @@ services:
   - docker
 env:
   global:
-    - DOCKER_COMPOSE_VERSION=1.25.4
     - KEEPALIVE=60
     - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation\""
     - SERVER=firehose-test.flightaware.com
@@ -36,11 +35,6 @@ jobs:
         - make pip-sync-travis
 
     - stage: Full_Integration
-      before_install:
-        - sudo rm /usr/local/bin/docker-compose
-        - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
-        - chmod +x docker-compose
-        - sudo mv docker-compose /usr/local/bin
       install:
         - docker-compose up -d --build
         - docker ps
