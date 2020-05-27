@@ -1,10 +1,10 @@
 # Roadmap
-### v1 (current release)
+### v1
 Firestarter v1 contains 2 services and an example application. With these
 components you can track flights at the granularity of departures and arrivals
 (using flight info messages) and view them in a FIDS-like interface.
 
-### v2
+### v2 (current release)
 Firestarter v2 will introduce a robust queueing component between the connector
 and its clients, allowing for efficient data fan-out.
 
