@@ -45,7 +45,7 @@ services:
       # (1) or wait until its first client has connected before it connects to
       # Firehose (0).
       - PYTHONUNBUFFERED=1
-      # Each consumer should have its own unique kafka topic name
+      # Each producer should have its own unique kafka topic name
       - KAFKA_TOPIC_NAME=feed1
     logging:
       driver: "json-file"
