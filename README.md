@@ -70,6 +70,30 @@ be used in a production environment, this sample application should only be
 considered a demonstration of what can be built using the data from Firehose.
 It should *not* be used in a production environment.
 
+### kafka/zookeeper
+We are using kafka as a message queue between the connector and the db-updater.
+Kafka depends on zookeeper to coordinate some important tasks, so we included
+that as well. We chose to pull existing docker containers for these pieces of
+software.
+Their documentation can be found here:
+https://hub.docker.com/r/bitnami/kafka/
+https://hub.docker.com/r/bitnami/zookeeper/
+
+In this code, the connector is the kafka "producer" and the db-updater is the
+kafka "consumer". If db-updater stops running and restarts, kafka will ensure
+that it starts reading from the queue where it left off. We recommend that 
+you let kafka take care of this offset reconnect logic.
+
+The relevant consumer code in the db-updater is here:
+https://github.com/flightaware/firestarter/blob/master/db-updater/main.py#L334
+
+We ensure that the kafka consumer will start where it left off with the
+"enable_auto_commit" and "auto_commit_interval_ms" parameters. We also need to
+be sure to provide a group name to store the last offset. Consumers with
+different group names will each consume all messages in a given topic, and
+consumers with the same group name will split messages from that topic between
+them.
+
 
 Check out [the roadmap](./ROADMAP.md) to see what components are coming in the
 future!
