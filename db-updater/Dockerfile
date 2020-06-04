@@ -11,11 +11,12 @@ RUN mkdir app
 WORKDIR /home/firestarter/app
 RUN mkdir db
 COPY --chown=firestarter db-updater/requirements ./requirements
-COPY --chown=firestarter db-updater/main.py .
 COPY --chown=firestarter db-updater/Makefile .
 
 RUN make docker-setup
 ENV VIRTUAL_ENV=./venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY --chown=firestarter db-updater/main.py .
 
 CMD ["python3", "main.py"]
