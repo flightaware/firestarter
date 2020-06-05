@@ -45,6 +45,8 @@ address).
 
 ## Firestarter Components
 
+![](docs/architecture-diagram.png)
+
 ### connector
 The connector service handles connecting to Firehose over an SSL socket. This
 involves building and sending the initiation command, handling compression, and
