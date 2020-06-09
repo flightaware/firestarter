@@ -21,7 +21,6 @@ RUN cd frontend && \
 
 RUN mkdir db
 COPY --chown=firestarter fids/requirements ./requirements
-COPY --chown=firestarter fids/app.py .
 COPY --chown=firestarter fids/Makefile .
 
 ENV FLASK_APP=app.py
@@ -30,5 +29,7 @@ ENV FLASK_ENV=development
 RUN make docker-setup
 ENV VIRTUAL_ENV=./venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+COPY --chown=firestarter fids/app.py .
 
 CMD ["python3", "app.py"]

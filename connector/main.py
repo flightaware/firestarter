@@ -9,8 +9,7 @@ import time
 import warnings
 import zlib
 from typing import Optional, Tuple
-from kafka import KafkaProducer  # type: ignore
-from kafka.errors import NoBrokersAvailable  # type: ignore
+from confluent_kafka import KafkaException, Producer  # type: ignore
 
 CONNECTION_ERROR_LIMIT = 3
 
@@ -26,7 +25,7 @@ STATS_PERIOD: int
 # pylint: disable=invalid-name
 stats_lock: asyncio.Lock
 finished: asyncio.Event
-producer: KafkaProducer
+producer: Producer
 
 lines_read: int = 0
 bytes_read: int = 0
@@ -225,10 +224,30 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             lines_read += 1
             bytes_read += len(line)
 
-        producer.send(os.getenv("KAFKA_TOPIC_NAME"), line)
-        producer.flush()
+        def delivery_report(err, _):
+            if err is not None:
+                # All we can really do is report it
+                print(f"Error when delivering message: {err}")
+
+        key = message.get("id", "").encode() or None
+        try:
+            producer.produce(
+                os.getenv("KAFKA_TOPIC_NAME"), key=key, value=line, callback=delivery_report
+            )
+        except BufferError as e:
+            print(f"Encountered full outgoing buffer, should resolve itself: {e}")
+        except KafkaException as e:
+            if not e.args[0].retriable():
+                raise
+            print(
+                f"Encountered retriable kafka error (e.args[0].str()), "
+                "waiting a moment and trying again"
+            )
+            time.sleep(1)
+        producer.poll(0)
 
     # We'll only reach this point if something's wrong with the connection.
+    producer.flush()
     return pitr
 
 
@@ -241,8 +260,8 @@ async def main():
     producer = None
     while producer is None:
         try:
-            producer = KafkaProducer(bootstrap_servers=["kafka:9092"])
-        except NoBrokersAvailable as error:
+            producer = Producer({"bootstrap.servers": "kafka:9092", "linger.ms": 500})
+        except KafkaException as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
 
