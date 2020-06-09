@@ -10,9 +10,8 @@ import time
 import traceback
 import warnings
 from typing import Optional, Generator, KeysView
-from kafka import KafkaConsumer  # type: ignore
-from kafka.errors import NoBrokersAvailable  # type: ignore
 
+from confluent_kafka import KafkaException, Consumer  # type: ignore
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import func, select, bindparam, and_  # type: ignore
 
@@ -327,27 +326,43 @@ def main():
         "keepalive": process_keepalive_message,
     }
 
+    consumer = None
     while True:
         try:
-            consumer = KafkaConsumer(
-                os.getenv("KAFKA_TOPIC_NAME"),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-                auto_commit_interval_ms=1000,
-                bootstrap_servers=["kafka:9092"],
-                group_id=os.getenv("KAFKA_GROUP_NAME"),
-            )
-
-            threading.Thread(target=flush_cache, name="flush_cache").start()
-            threading.Thread(target=expire_old_flights, name="expire").start()
-            for msg in consumer:
-                message = json.loads(msg.value)
-                processor_functions.get(message["type"], process_unknown_message)(message)
-            print("Disconneted from kafka, quitting")
+            # Handle case where we initialized the consumer but failed to
+            # subscribe. Don't want to keep initializing.
+            if consumer is None:
+                consumer = Consumer(
+                    {
+                        "bootstrap.servers": "kafka:9092",
+                        "group.id": os.getenv("KAFKA_GROUP_NAME"),
+                        "auto.offset.reset": "earliest",
+                        # Consider committing manually upon writes to db
+                        # true by default anyway
+                        "enable.auto.commit": True,
+                        "auto.commit.interval.ms": 1000,
+                    }
+                )
+            consumer.subscribe([os.getenv("KAFKA_TOPIC_NAME")])
             break
-        except (OSError, NoBrokersAvailable) as error:
+        except (KafkaException, OSError) as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
+
+    threading.Thread(target=flush_cache, name="flush_cache").start()
+    threading.Thread(target=expire_old_flights, name="expire").start()
+    while True:
+        # Polling will mask SIGINT, just fyi
+        messagestr = consumer.poll(timeout=1.0)
+        if messagestr is None:
+            # poll timed out
+            continue
+        if messagestr.error():
+            print(f"Encountered kafka error: {messagestr.error()}")
+            # They continue in the examples, so let's do it as well
+            continue
+        message = json.loads(messagestr.value())
+        processor_functions.get(message["type"], process_unknown_message)(message)
 
 
 if __name__ == "__main__":
