@@ -5,7 +5,7 @@ import warnings
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, ANY
 import main
 
 
@@ -61,7 +61,7 @@ class TestReconnect(unittest.TestCase):
             self.mock_reader.readline.coro.side_effect = [error]
         else:
             self.mock_reader.readline.coro.side_effect = [
-                b'{"pitr":"1584126630","type":"position"}',
+                b'{"pitr":"1584126630","type":"position","id":"KPVD-1588929046-hexid-ADF994"}',
                 error,
             ]
         mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
@@ -80,7 +80,7 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.send.assert_not_called()
+            mock_kafkaproducer.return_value.produce.assert_not_called()
         else:
             # verify expected init cmds
             self.assertEqual(
@@ -91,46 +91,49 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.send.assert_called_once_with(
-                "topic1", b'{"pitr":"1584126630","type":"position"}'
+            mock_kafkaproducer.return_value.produce.assert_called_once_with(
+                "topic1",
+                key=b"KPVD-1588929046-hexid-ADF994",
+                value=b'{"pitr":"1584126630","type":"position","id":"KPVD-1588929046-hexid-ADF994"}',
+                callback=ANY,
             )
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_pitr_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, b"")
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_live_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b"")
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_pitr_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             False, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_live_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             True, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_pitr_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, AttributeError)
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_live_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, AttributeError)
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_pitr_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             False,
@@ -140,7 +143,7 @@ class TestReconnect(unittest.TestCase):
         )
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_live_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             True,
@@ -165,12 +168,12 @@ class TestCompression(unittest.TestCase):
         self.fh_reader, self.fh_writer = await self.save_main_open_connection(*args, **kwargs)
         return self.fh_reader, self.fh_writer
 
-    def save_line_stop_test(self, topic, msg):
-        self.emitted_msg.append(msg)
+    def save_line_stop_test(self, topic, value=None, key=None, callback=None):
+        self.emitted_msg.append(value)
         raise EndTestNow()
 
     def compression(self, mock_kafkaproducer, mock_openconnection, compression):
-        mock_kafkaproducer.return_value.send.side_effect = self.save_line_stop_test
+        mock_kafkaproducer.return_value.produce.side_effect = self.save_line_stop_test
         mock_openconnection.side_effect = self.wrap_open_connection
         # run test
         with self.assertRaises(EndTestNow):
@@ -185,21 +188,21 @@ class TestCompression(unittest.TestCase):
         )
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_no_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "")
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_gzip_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "gzip")
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_compress_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "compress")
 
     @patch("main.open_connection", new_callable=CoroMock)
-    @patch("main.KafkaProducer", new_callable=Mock)
+    @patch("main.Producer", new_callable=Mock)
     def test_deflate_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "deflate")
