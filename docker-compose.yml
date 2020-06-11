@@ -45,8 +45,10 @@ services:
       # (1) or wait until its first client has connected before it connects to
       # Firehose (0).
       - PYTHONUNBUFFERED=1
-      # Each producer should have its own unique kafka topic name
-      - KAFKA_TOPIC_NAME=feed1
+      # Each producer should have its own unique FLIFO kafka topic name
+      - KAFKA_FLIFO_TOPIC_NAME=feed1
+      # Each producer should have its own unique POSITION kafka topic name
+      - KAFKA_POSITION_TOPIC_NAME=position_feed1
     logging:
       driver: "json-file"
       options:
@@ -71,6 +73,8 @@ services:
       # Consumers with the same group name will split the data between them,
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=group1
+      # Set this to "flights" or "positions" depending on what kinds of messages this updater is handling
+      - TABLE=flights
     volumes:
       - data:/home/firestarter/app/db
     logging:
@@ -78,6 +82,34 @@ services:
       options:
         max-size: "10mb"
         max-file: "5"
+
+  position-db-updater-1:
+    image: "firestarter_db-updater:1.0"
+    build:
+      context: .
+      dockerfile: db-updater/Dockerfile
+    init: true
+    networks:
+      - internal
+    environment:
+      # URL to database that will be updated based on Firehose contents.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - DB_URL=${DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - PYTHONUNBUFFERED=1
+      # Same kafka topic name as the producer of the feed that you want to consume
+      - KAFKA_TOPIC_NAME=position_feed1
+      # Consumers with the same group name will split the data between them,
+      # but consumers with different group names will each receive all of the messages 
+      - KAFKA_GROUP_NAME=position_group1
+      # Set this to "flights" or "positions" depending on what kinds of messages this updater is handling
+      - TABLE=positions
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+    depends_on:
+      - timescaledb
 
   fids:
     image: "firestarter_fids:1.0"
@@ -132,9 +164,21 @@ services:
     depends_on:
       - zookeeper
 
+  timescaledb:
+    image: "timescale/timescaledb:1.7.1-pg12"
+    init: true
+    ports:
+      - "5432:5432"
+    networks:
+      - internal
+    environment:
+      - POSTGRES_PASSWORD=positions
+    volumes:
+      - position_data:/var/lib/postgresql/data
 
 volumes:
   data:
+  position_data:
   kafka_data:
   zookeeper_data:
 
