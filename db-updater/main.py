@@ -16,6 +16,8 @@ from kafka.errors import NoBrokersAvailable  # type: ignore
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import func, select, bindparam, and_  # type: ignore
 
+time.sleep(10)
+
 # SQLAlchemy doesn't properly understand when you use columns with a "key"
 # property with PostgreSQL's on_conflict_do_update statement, so it prints a
 # pointless warning that we can just ignore.
@@ -25,55 +27,83 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
-flights = sa.Table(
-    "flights",
-    meta,
-    sa.Column("id", sa.String, primary_key=True),
-    sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
-    sa.Column(
-        "changed", TIMESTAMP_TZ(), nullable=False, server_default=func.now(), onupdate=func.now(),
-    ),
-    sa.Column("flight_number", sa.String, key="ident"),
-    sa.Column("registration", sa.String, key="reg"),
-    sa.Column("atc_ident", sa.String, key="atcident"),
-    sa.Column("hexid", sa.String),
-    sa.Column("origin", sa.String, key="orig"),
-    sa.Column("destination", sa.String, key="dest"),
-    sa.Column("aircraft_type", sa.String, key="aircrafttype"),
-    sa.Column("filed_ground_speed", sa.Integer, key="gs"),
-    sa.Column("filed_speed", sa.Integer, key="speed"),
-    sa.Column("filed_altitude", sa.Integer, key="alt"),
-    sa.Column("true_cancel", sa.Boolean, key="trueCancel"),
-    # These come through as a very lengthy list, worth stringifying?
-    # sa.Column("waypoints", sa.String),
-    sa.Column("route", sa.String),
-    sa.Column("status", sa.Enum("S", "F", "A", "X", "Y", "Z", name="flightstatus")),
-    sa.Column("actual_arrival_gate", sa.String),
-    sa.Column("estimated_arrival_gate", sa.String),
-    sa.Column("actual_departure_gate", sa.String),
-    sa.Column("estimated_departure_gate", sa.String),
-    sa.Column("actual_arrival_terminal", sa.String),
-    sa.Column("scheduled_arrival_terminal", sa.String),
-    sa.Column("actual_departure_terminal", sa.String),
-    sa.Column("scheduled_departure_terminal", sa.String),
-    sa.Column("baggage_claim", sa.String),
-    sa.Column("cancelled", TIMESTAMP_TZ()),
-    sa.Column("filed_off", TIMESTAMP_TZ(), key="fdt"),
-    sa.Column("actual_out", TIMESTAMP_TZ()),
-    sa.Column("actual_off", TIMESTAMP_TZ(), key="adt"),
-    sa.Column("actual_on", TIMESTAMP_TZ(), key="aat"),
-    sa.Column("actual_in", TIMESTAMP_TZ()),
-    sa.Column("estimated_out", TIMESTAMP_TZ()),
-    sa.Column("estimated_off", TIMESTAMP_TZ(), key="edt"),
-    sa.Column("estimated_on", TIMESTAMP_TZ(), key="eta"),
-    sa.Column("estimated_in", TIMESTAMP_TZ()),
-    sa.Column("scheduled_out", TIMESTAMP_TZ()),
-    sa.Column("scheduled_in", TIMESTAMP_TZ()),
-    sa.Column("predicted_out", TIMESTAMP_TZ()),
-    sa.Column("predicted_off", TIMESTAMP_TZ()),
-    sa.Column("predicted_on", TIMESTAMP_TZ()),
-    sa.Column("predicted_in", TIMESTAMP_TZ()),
-)
+
+if os.getenv("TABLE") == "flights":
+    table = sa.Table(
+        "flights",
+        meta,
+        sa.Column("id", sa.String, primary_key=True),
+        sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
+        sa.Column(
+            "changed", TIMESTAMP_TZ(), nullable=False, server_default=func.now(), onupdate=func.now(),
+        ),
+        sa.Column("flight_number", sa.String, key="ident"),
+        sa.Column("registration", sa.String, key="reg"),
+        sa.Column("atc_ident", sa.String, key="atcident"),
+        sa.Column("hexid", sa.String),
+        sa.Column("origin", sa.String, key="orig"),
+        sa.Column("destination", sa.String, key="dest"),
+        sa.Column("aircraft_type", sa.String, key="aircrafttype"),
+        sa.Column("filed_ground_speed", sa.Integer, key="gs"),
+        sa.Column("filed_speed", sa.Integer, key="speed"),
+        sa.Column("filed_altitude", sa.Integer, key="alt"),
+        sa.Column("true_cancel", sa.Boolean, key="trueCancel"),
+        # These come through as a very lengthy list, worth stringifying?
+        # sa.Column("waypoints", sa.String),
+        sa.Column("route", sa.String),
+        sa.Column("status", sa.Enum("S", "F", "A", "X", "Y", "Z", name="flightstatus")),
+        sa.Column("actual_arrival_gate", sa.String),
+        sa.Column("estimated_arrival_gate", sa.String),
+        sa.Column("actual_departure_gate", sa.String),
+        sa.Column("estimated_departure_gate", sa.String),
+        sa.Column("actual_arrival_terminal", sa.String),
+        sa.Column("scheduled_arrival_terminal", sa.String),
+        sa.Column("actual_departure_terminal", sa.String),
+        sa.Column("scheduled_departure_terminal", sa.String),
+        sa.Column("baggage_claim", sa.String),
+        sa.Column("cancelled", TIMESTAMP_TZ()),
+        sa.Column("filed_off", TIMESTAMP_TZ(), key="fdt"),
+        sa.Column("actual_out", TIMESTAMP_TZ()),
+        sa.Column("actual_off", TIMESTAMP_TZ(), key="adt"),
+        sa.Column("actual_on", TIMESTAMP_TZ(), key="aat"),
+        sa.Column("actual_in", TIMESTAMP_TZ()),
+        sa.Column("estimated_out", TIMESTAMP_TZ()),
+        sa.Column("estimated_off", TIMESTAMP_TZ(), key="edt"),
+        sa.Column("estimated_on", TIMESTAMP_TZ(), key="eta"),
+        sa.Column("estimated_in", TIMESTAMP_TZ()),
+        sa.Column("scheduled_out", TIMESTAMP_TZ()),
+        sa.Column("scheduled_in", TIMESTAMP_TZ()),
+        sa.Column("predicted_out", TIMESTAMP_TZ()),
+        sa.Column("predicted_off", TIMESTAMP_TZ()),
+        sa.Column("predicted_on", TIMESTAMP_TZ()),
+        sa.Column("predicted_in", TIMESTAMP_TZ()),
+    )
+else:
+    table = sa.Table(
+        "positions",
+        meta,
+        sa.Column("id", sa.String, key="id"),
+        sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
+        sa.Column("time", TIMESTAMP_TZ(), nullable=False, key="clock"),
+        sa.Column("latitude", sa.String, key="lat"),
+        sa.Column("longitude", sa.String, key="lon"),
+        sa.Column("altitude", sa.Integer, key="alt"),
+        sa.Column("groundspeed", sa.Integer, key="gs"),
+        sa.Column("heading", sa.String, key="heading"),
+        sa.Column("magnetic_heading", sa.String, key="heading_magnetic"),
+        sa.Column("true_heading", sa.String, key="heading_true"),
+        sa.Column("mach_number", sa.String, key="mach"),
+        sa.Column("air_pressure", sa.Integer, key="pressure"),
+        sa.Column("filed_cruising_speed", sa.Integer, key="speed"),
+        sa.Column("indicated_airspeed", sa.Integer, key="speed_ias"),
+        sa.Column("true_airspeed", sa.Integer, key="speed_tas"),
+        sa.Column("squawk", sa.Integer, key="squawk"),
+        sa.Column("temperature", sa.Integer, key="temperature"),
+        sa.Column("temperature_quality", sa.Integer, key="temperature_quality"),
+        sa.Column("wind_direction", sa.Integer, key="wind_dir"),
+        sa.Column("wind_quality", sa.Integer, key="wind_quality"),
+        sa.Column("wind_speed", sa.Integer, key="wind_speed"),
+    )
 
 engine_args: dict = {}
 db_url: str = os.getenv("DB_URL")  # type: ignore
@@ -93,15 +123,15 @@ elif "sqlite" in db_url:
 engine = sa.create_engine(db_url, **engine_args)
 
 # Columns in the table that we'll explicitly be setting
-MSG_TABLE_COLS = {c for c in flights.c if c.server_default is None}
-# The keys in a message that we want in the flights table
+MSG_TABLE_COLS = {c for c in table.c if c.server_default is None}
+# The keys in a message that we want in the table
 MSG_TABLE_KEYS = {c.key for c in MSG_TABLE_COLS}
 
 finished = threading.Event()
 cache_lock = threading.Lock()
 # Use a cache for accumulating flight information, flushing it to the database
 # as necessary.  It should contain full versions of flight rows (rather than
-# the sparse ones we might get if we just insert/update flights according to
+# the sparse ones we might get if we just insert/update the table according to
 # received data) to ensure proper behavior of executemany-style SQLAlchemy
 # statements.
 # https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
@@ -113,7 +143,7 @@ SQLITE_VAR_LIMIT = None
 @sa.event.listens_for(engine, "begin")
 def do_begin(conn: sa.engine.Transaction) -> None:
     """emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
-    error if we happen to expire flights between the flush_cache thread's
+    error if we happen to expire entries in the table between the flush_cache thread's
     read and write (more info about how this can occur:
     https://www.sqlite.org/rescode.html#busy_snapshot)
     """
@@ -130,7 +160,7 @@ def convert_msg_fields(msg: dict) -> dict:
     for key in msg.keys() - MSG_TABLE_KEYS:
         del msg[key]
     for key, val in msg.items():
-        column_type = str(flights.c[key].type)
+        column_type = str(table.c[key].type)
         if column_type == "TIMESTAMP":
             msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
         elif column_type == "INTEGER":
@@ -139,6 +169,13 @@ def convert_msg_fields(msg: dict) -> dict:
             msg[key] = bool(int(val))
     return msg
 
+def insert(data: dict) -> None:
+    """Insert new row into the database"""
+    converted = convert_msg_fields(data)
+    with cache_lock:
+        cache[insert.index].update(converted)
+    insert.index += 1
+insert.index = 0
 
 def insert_or_update(data: dict) -> None:
     """Insert new row into the database or update an existing row"""
@@ -164,22 +201,25 @@ def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
 
 
 def flush_cache() -> None:
-    """Add flights into the database"""
+    """Add info into the database table"""
     while not finished.is_set():
         finished.wait(2)
         with cache_lock, engine.begin() as conn:
             if not cache:
                 continue
-            _flush_cache(conn)
+            if os.getenv("TABLE") == "flights":
+                _flush_flifo_cache(conn)
+            elif os.getenv("TABLE") == "positions":
+                _flush_position_cache(conn)
 
-def _flush_cache(conn) -> None:
-        print(f"Flushing {len(cache)} new/updated flights to database")
+def _flush_flifo_cache(conn) -> None:
+        print(f"Flushing {len(cache)} new/updated entries to table")
         if engine.name == "postgresql":
             # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
             # pylint: disable=import-outside-toplevel
             from sqlalchemy.dialects.postgresql import insert  # type: ignore
 
-            statement = insert(flights)
+            statement = insert(table)
             # This builds the "SET ?=?" part of the update statement,
             # making sure to keep the row's current values if they're
             # non-null and the new row's are null
@@ -199,7 +239,7 @@ def _flush_cache(conn) -> None:
             # limits: https://www.sqlite.org/limits.html#max_variable_number
             id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
             existing = chain.from_iterable(
-                conn.execute(select([flights]).where(flights.c.id.in_(keys)))
+                conn.execute(select([table]).where(table.c.id.in_(keys)))
                 for keys in id_chunks
             )
             for flight in existing:
@@ -211,37 +251,42 @@ def _flush_cache(conn) -> None:
                 # below) for itself, so we need to rename this
                 cache_flight["_id"] = cache_flight.pop("id")
                 updates.append(cache_flight)
-            # We removed the to-be-updated flights from the cache, so
+            # We removed the to-be-updated entries from the cache, so
             # insert the rest
             inserts = cache.values()
             # pylint: disable=no-value-for-parameter
             if updates:
                 conn.execute(
-                    flights.update().where(flights.c.id == bindparam("_id")), *updates,
+                    table.update().where(table.c.id == bindparam("_id")), *updates,
                 )
             if inserts:
-                conn.execute(flights.insert(), *inserts)
+                conn.execute(table.insert(), *inserts)
         cache.clear()
 
+def _flush_position_cache(conn) -> None:
+        print(f"Flushing {len(cache)} new entries to table")
+        inserts = cache.values()
+        conn.execute(table.insert(), *cache.values())
+        cache.clear()
 
-def expire_old_flights() -> None:
-    """Wrapper for _expire_old_flights"""
+def expire_old_from_table() -> None:
+    """Wrapper for _expire_old_from_table"""
     while not finished.is_set():
         finished.wait(60)
-        _expire_old_flights()
+        _expire_old_from_table()
 
 
-def _expire_old_flights() -> None:
-    """Remove flights from the database if they have not been updated in 48 hours"""
+def _expire_old_from_table() -> None:
+    """Remove entries from the database if they have not been updated in 48 hours"""
     dropoff = datetime.now(tz=UTC) - timedelta(hours=48)
     dtmin = datetime.min.replace(tzinfo=UTC)
     # pylint: disable=no-value-for-parameter
-    statement = flights.delete().where(
-        and_(*(func.coalesce(c, dtmin) < dropoff for c in flights.c if str(c.type) == "TIMESTAMP"))
+    statement = table.delete().where(
+        and_(*(func.coalesce(c, dtmin) < dropoff for c in table.c if str(c.type) == "TIMESTAMP"))
     )
     result = engine.execute(statement)
     if result.rowcount:
-        print(f"Expired {result.rowcount} flights from database")
+        print(f"Expired {result.rowcount} entries from database")
     result.close()
 
 
@@ -287,6 +332,9 @@ def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
     return insert_or_update(data)
 
+def process_position_message(data: dict) -> None:
+    """Position message type"""
+    return insert(data)
 
 def process_keepalive_message(data: dict) -> None:
     """Keepalive message type"""
@@ -311,12 +359,17 @@ def setup_sqlite() -> None:
 
 def main():
     """Read flight updates from kafka and store them into the database"""
+    exists = False
     if engine.name == "sqlite":
         setup_sqlite()
-    if engine.has_table("flights"):
-        print("flights table already exists, clearing expired flights before continuing")
-        _expire_old_flights()
+    if engine.has_table(os.getenv("TABLE")):
+        print(f"{os.getenv('TABLE')} table already exists, clearing expired {os.getenv('TABLE')} before continuing")
+        _expire_old_from_table()
+        exists = True
     meta.create_all(engine)
+
+    if os.getenv("TABLE") == "positions" and not exists:
+        engine.execute("SELECT create_hypertable('positions', 'time')")
 
     processor_functions = {
         "arrival": process_arrival_message,
@@ -327,6 +380,7 @@ def main():
         "extendedFlightInfo": process_extended_flight_info_message,
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
+        "position": process_position_message,
     }
 
     while True:
@@ -341,7 +395,7 @@ def main():
             )
 
             threading.Thread(target=flush_cache, name="flush_cache").start()
-            threading.Thread(target=expire_old_flights, name="expire").start()
+            threading.Thread(target=expire_old_from_table, name="expire").start()
             for msg in consumer:
                 message = json.loads(msg.value)
                 processor_functions.get(message["type"], process_unknown_message)(message)
