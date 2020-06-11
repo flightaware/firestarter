@@ -225,7 +225,13 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             lines_read += 1
             bytes_read += len(line)
 
-        producer.send(os.getenv("KAFKA_TOPIC_NAME"), line)
+        if message["type"] == "keepalive":
+            producer.send(os.getenv("KAFKA_POSITION_TOPIC_NAME"), line)
+            producer.send(os.getenv("KAFKA_FLIFO_TOPIC_NAME"), line)
+        elif message["type"] == "position":
+            producer.send(os.getenv("KAFKA_POSITION_TOPIC_NAME"), line)
+        else:
+            producer.send(os.getenv("KAFKA_FLIFO_TOPIC_NAME"), line)
         producer.flush()
 
     # We'll only reach this point if something's wrong with the connection.
