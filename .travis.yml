@@ -33,6 +33,16 @@ jobs:
         - cd fids
         - make pip-sync-travis
 
+    - stage: Performance
+      env:
+          - INIT_CMD_TIME="pitr 1577880000"
+          - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation position\""
+      install:
+        - docker-compose up -d --build
+        - docker ps
+      script:
+        - ./travis_performance_regression_test.sh
+
     - stage: Full_Integration
       env:
           - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation position\""
@@ -44,14 +54,3 @@ jobs:
         - python3 -m pip install selenium
       script:
         - python3 travis_ping_frontend.py
-
-    - stage: Performance
-      env:
-          - INIT_CMD_TIME="pitr 1577880000"
-          - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation position\""
-      install:
-        - docker-compose up -d --build
-        - docker ps
-      script:
-        - ls
-        - ./travis_performance_regression_test.sh
