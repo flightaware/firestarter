@@ -10,12 +10,12 @@ positions_count=$(docker exec -it $(docker ps | grep firestarter_timescaledb_1 |
 echo "Flights Count: ${flights_count}"
 echo "Positions Count: ${positions_count}"
 
-if [ $flights_count -lt 45000 ]; then
+if [[ $flights_count < 45000 ]]; then
 	echo "Flight count lower than threshold 45000"
 	exit 1
 fi
 
-if [ $positions_count -lt 450000 ]; then
+if [[ $positions_count < 450000 ]]; then
 	echo "Position count lower than threshold 450000"
 	exit 1
 fi
