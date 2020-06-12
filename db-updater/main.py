@@ -10,13 +10,12 @@ import time
 import traceback
 import warnings
 from typing import Optional, Generator, KeysView
-from kafka import KafkaConsumer  # type: ignore
-from kafka.errors import NoBrokersAvailable  # type: ignore
 
+from confluent_kafka import KafkaException, Consumer  # type: ignore
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import func, select, bindparam, and_  # type: ignore
 
-time.sleep(10)
+#time.sleep(10)
 
 # SQLAlchemy doesn't properly understand when you use columns with a "key"
 # property with PostgreSQL's on_conflict_do_update statement, so it prints a
@@ -27,7 +26,6 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
-
 if os.getenv("TABLE") == "flights":
     table = sa.Table(
         "flights",
@@ -78,7 +76,7 @@ if os.getenv("TABLE") == "flights":
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
     )
-else:
+elif os.getenv("TABLE") == "positions":
     table = sa.Table(
         "positions",
         meta,
@@ -97,9 +95,9 @@ else:
         sa.Column("filed_cruising_speed", sa.Integer, key="speed"),
         sa.Column("indicated_airspeed", sa.Integer, key="speed_ias"),
         sa.Column("true_airspeed", sa.Integer, key="speed_tas"),
-        sa.Column("squawk", sa.Integer, key="squawk"),
-        sa.Column("temperature", sa.Integer, key="temperature"),
-        sa.Column("temperature_quality", sa.Integer, key="temperature_quality"),
+        sa.Column("squawk", sa.Integer),
+        sa.Column("temperature", sa.Integer),
+        sa.Column("temperature_quality", sa.Integer),
         sa.Column("wind_direction", sa.Integer, key="wind_dir"),
         sa.Column("wind_quality", sa.Integer, key="wind_quality"),
         sa.Column("wind_speed", sa.Integer, key="wind_speed"),
@@ -107,12 +105,20 @@ else:
 
 engine_args: dict = {}
 db_url: str = os.getenv("DB_URL")  # type: ignore
+
+attempt_hypertable = 0
 if "postgresql" in db_url:
+    # Wait 10 seconds to wait for postgres to come up
+    time.sleep(10)
+
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
     # performance even more.
     # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#psycopg2-fast-execution-helpers
     engine_args["executemany_mode"] = "values"
+
+    # Make a hypertable on TimescaleDB
+    attempt_hypertable = 1
 elif "sqlite" in db_url:
     # isolation_level setting works around buggy Python sqlite driver behavior
     # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl
@@ -208,66 +214,64 @@ def flush_cache() -> None:
             if not cache:
                 continue
             if os.getenv("TABLE") == "flights":
-                _flush_flifo_cache(conn)
+                _flush_flight_cache(conn)
             elif os.getenv("TABLE") == "positions":
                 _flush_position_cache(conn)
 
-def _flush_flifo_cache(conn) -> None:
-        print(f"Flushing {len(cache)} new/updated entries to table")
-        if engine.name == "postgresql":
-            # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
-            # pylint: disable=import-outside-toplevel
-            from sqlalchemy.dialects.postgresql import insert  # type: ignore
+def _flush_flight_cache(conn) -> None:
+    print(f"Flushing {len(cache)} new/updated to database")
+    if engine.name == "postgresql":
+        # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
+        # pylint: disable=import-outside-toplevel
+        from sqlalchemy.dialects.postgresql import insert  # type: ignore
 
-            statement = insert(table)
-            # This builds the "SET ?=?" part of the update statement,
-            # making sure to keep the row's current values if they're
-            # non-null and the new row's are null
-            col_updates = {
-                c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS
-            }
-            # on_conflict_do_update won't handle Columns with onupdate set.
-            # Have to do it ourselves.
-            # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
-            col_updates["changed"] = func.now()
-            statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
-            conn.execute(statement, *cache.values())
-        else:
-            updates = []
-            # Get all rows from database that will need updating. Parameter
-            # list is chunked as needed to prevent overrunning sqlite
-            # limits: https://www.sqlite.org/limits.html#max_variable_number
-            id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
-            existing = chain.from_iterable(
-                conn.execute(select([table]).where(table.c.id.in_(keys)))
-                for keys in id_chunks
+        statement = insert(table)
+        # This builds the "SET ?=?" part of the update statement,
+        # making sure to keep the row's current values if they're
+        # non-null and the new row's are null
+        col_updates = {c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS}
+        # on_conflict_do_update won't handle Columns with onupdate set.
+        # Have to do it ourselves.
+        # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
+        col_updates["changed"] = func.now()
+        statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
+        conn.execute(statement, *cache.values())
+    else:
+        updates = []
+        # Get all rows from database that will need updating. Parameter
+        # list is chunked as needed to prevent overrunning sqlite
+        # limits: https://www.sqlite.org/limits.html#max_variable_number
+        id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
+        existing = chain.from_iterable(
+            conn.execute(select([table]).where(table.c.id.in_(keys))) for keys in id_chunks
+        )
+        for flight in existing:
+            cache_flight = cache.pop(flight["id"])
+            for k in cache_flight:
+                if cache_flight[k] is None:
+                    cache_flight[k] = flight[k]
+            # SQLAlchemy reserves column names in bindparam (used
+            # below) for itself, so we need to rename this
+            cache_flight["_id"] = cache_flight.pop("id")
+            updates.append(cache_flight)
+        # We removed the to-be-updated entrier from the cache, so
+        # insert the rest
+        inserts = cache.values()
+        # pylint: disable=no-value-for-parameter
+        if updates:
+            conn.execute(
+                table.update().where(table.c.id == bindparam("_id")), *updates,
             )
-            for flight in existing:
-                cache_flight = cache.pop(flight["id"])
-                for k in cache_flight:
-                    if cache_flight[k] is None:
-                        cache_flight[k] = flight[k]
-                # SQLAlchemy reserves column names in bindparam (used
-                # below) for itself, so we need to rename this
-                cache_flight["_id"] = cache_flight.pop("id")
-                updates.append(cache_flight)
-            # We removed the to-be-updated entries from the cache, so
-            # insert the rest
-            inserts = cache.values()
-            # pylint: disable=no-value-for-parameter
-            if updates:
-                conn.execute(
-                    table.update().where(table.c.id == bindparam("_id")), *updates,
-                )
-            if inserts:
-                conn.execute(table.insert(), *inserts)
-        cache.clear()
+        if inserts:
+            conn.execute(table.insert(), *inserts)
+    cache.clear()
+
 
 def _flush_position_cache(conn) -> None:
-        print(f"Flushing {len(cache)} new entries to table")
-        inserts = cache.values()
-        conn.execute(table.insert(), *cache.values())
-        cache.clear()
+    print(f"Flushing {len(cache)} new entries to table")
+    inserts = cache.values()
+    conn.execute(table.insert(), *cache.values())
+    cache.clear()
 
 def expire_old_from_table() -> None:
     """Wrapper for _expire_old_from_table"""
@@ -359,6 +363,8 @@ def setup_sqlite() -> None:
 
 def main():
     """Read flight updates from kafka and store them into the database"""
+    global attempt_hypertable
+
     exists = False
     if engine.name == "sqlite":
         setup_sqlite()
@@ -368,8 +374,11 @@ def main():
         exists = True
     meta.create_all(engine)
 
-    if os.getenv("TABLE") == "positions" and not exists:
-        engine.execute("SELECT create_hypertable('positions', 'time')")
+    if attempt_hypertable and not exists:
+        try:
+            engine.execute("SELECT create_hypertable('positions', 'time')")
+        except Exception as error:
+            print("Could not create hypertable")
 
     processor_functions = {
         "arrival": process_arrival_message,
@@ -383,27 +392,43 @@ def main():
         "position": process_position_message,
     }
 
+    consumer = None
     while True:
         try:
-            consumer = KafkaConsumer(
-                os.getenv("KAFKA_TOPIC_NAME"),
-                auto_offset_reset="earliest",
-                enable_auto_commit=True,
-                auto_commit_interval_ms=1000,
-                bootstrap_servers=["kafka:9092"],
-                group_id=os.getenv("KAFKA_GROUP_NAME"),
-            )
-
-            threading.Thread(target=flush_cache, name="flush_cache").start()
-            threading.Thread(target=expire_old_from_table, name="expire").start()
-            for msg in consumer:
-                message = json.loads(msg.value)
-                processor_functions.get(message["type"], process_unknown_message)(message)
-            print("Disconneted from kafka, quitting")
+            # Handle case where we initialized the consumer but failed to
+            # subscribe. Don't want to keep initializing.
+            if consumer is None:
+                consumer = Consumer(
+                    {
+                        "bootstrap.servers": "kafka:9092",
+                        "group.id": os.getenv("KAFKA_GROUP_NAME"),
+                        "auto.offset.reset": "earliest",
+                        # Consider committing manually upon writes to db
+                        # true by default anyway
+                        "enable.auto.commit": True,
+                        "auto.commit.interval.ms": 1000,
+                    }
+                )
+            consumer.subscribe([os.getenv("KAFKA_TOPIC_NAME")])
             break
-        except (OSError, NoBrokersAvailable) as error:
+        except (KafkaException, OSError) as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
+
+    threading.Thread(target=flush_cache, name="flush_cache").start()
+    threading.Thread(target=expire_old_from_table, name="expire").start()
+    while True:
+        # Polling will mask SIGINT, just fyi
+        messagestr = consumer.poll(timeout=1.0)
+        if messagestr is None:
+            # poll timed out
+            continue
+        if messagestr.error():
+            print(f"Encountered kafka error: {messagestr.error()}")
+            # They continue in the examples, so let's do it as well
+            continue
+        message = json.loads(messagestr.value())
+        processor_functions.get(message["type"], process_unknown_message)(message)
 
 
 if __name__ == "__main__":
