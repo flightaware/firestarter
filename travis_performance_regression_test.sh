@@ -1,7 +1,6 @@
 #!/bin/bash
 
 sleep 5m
-docker ps
 
 flights_count=$(docker exec -it $(docker ps | grep firestarter_db-updater_1 | awk 'NF>1{print $NF}') sqlite3 /home/firestarter/app/db/flights.db 'SELECT COUNT(*) FROM flights')
 
