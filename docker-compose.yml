@@ -66,7 +66,7 @@ services:
     environment:
       # URL to database that will be updated based on Firehose contents.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
-      - DB_URL=${DB_URL:-sqlite:///db/flights.db}
+      - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
       - KAFKA_TOPIC_NAME=feed1
@@ -83,7 +83,7 @@ services:
         max-size: "10mb"
         max-file: "5"
 
-  position-db-updater-1:
+  position-db-updater:
     image: "firestarter_db-updater:1.0"
     build:
       context: .
@@ -94,7 +94,7 @@ services:
     environment:
       # URL to database that will be updated based on Firehose contents.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
-      - DB_URL=${DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - DB_URL=${POSITION_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
       - KAFKA_TOPIC_NAME=position_feed1
@@ -125,7 +125,7 @@ services:
     environment:
       # URL to database that is being updated by db-updater.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
-      - DB_URL=${DB_URL:-sqlite:///db/flights.db}
+      - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
     volumes:
       - data:/home/firestarter/app/db
