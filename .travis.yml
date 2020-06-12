@@ -19,6 +19,7 @@ jobs:
     - stage: Connector
       env: 
         - INIT_CMD_TIME="pitr 1577880000"
+        - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation\""
       install:
         - cd connector
         - make pip-sync-travis
