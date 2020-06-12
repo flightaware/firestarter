@@ -7,6 +7,15 @@ flights_count=$(docker exec -it $(docker ps | grep firestarter_db-updater_1 | aw
 
 positions_count=$(docker exec -it $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT COUNT(*) FROM positions')
 
-echo "${flights_count}"
+echo "Flights Count: ${flights_count}"
+echo "Positions Count: ${positions_count}"
 
-echo "${positions_count}"
+if [ $flights_count -lt 45000 ]; then
+	echo "Flight count lower than threshold 45000"
+	exit 1
+fi
+
+if [ $positions_count -lt 450000 ]; then
+	echo "Position count lower than threshold 450000"
+	exit 1
+fi
