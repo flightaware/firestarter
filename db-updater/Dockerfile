@@ -1,6 +1,6 @@
 FROM python:3.8-slim-buster
 
-RUN apt-get update && apt-get install -y libpq-dev gcc make
+RUN apt-get update && apt-get install -y libpq-dev gcc make sqlite3
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
