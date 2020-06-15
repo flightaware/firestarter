@@ -3,7 +3,6 @@ import os
 import shutil
 import datetime
 from sqlalchemy.sql import select
-import importlib
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
@@ -86,7 +85,10 @@ class TestInsertAndExpire(unittest.TestCase):
             pass
 
         with main.engine.begin() as conn:
-            main._flush_flight_cache(conn)
+            if table == "flights":
+                main._flush_flight_cache(conn)
+            elif table == "positions":
+                _flush_position_cache(conn)
             rows_in_table = conn.execute(
                 select([c for c in main.table.c if c.name != "changed" and c.name != "added"])
             )
