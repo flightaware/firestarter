@@ -26,7 +26,7 @@ TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 meta = sa.MetaData()
 
 if os.getenv("TABLE") not in ["flights", "positions"]:
-    raise ValueError(f"Invalid TABLE env variable: {os.getenv("TABLE")} - must be 'flights' or 'positions'")
+    raise ValueError(f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'")
 
 if os.getenv("TABLE") == "flights":
     table = sa.Table(
