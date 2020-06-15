@@ -88,7 +88,7 @@ class TestInsertAndExpire(unittest.TestCase):
             if table == "flights":
                 main._flush_flight_cache(conn)
             elif table == "positions":
-                _flush_position_cache(conn)
+                main._flush_position_cache(conn)
             rows_in_table = conn.execute(
                 select([c for c in main.table.c if c.name != "changed" and c.name != "added"])
             )
