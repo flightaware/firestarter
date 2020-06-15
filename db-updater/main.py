@@ -15,8 +15,6 @@ from confluent_kafka import KafkaException, Consumer  # type: ignore
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import func, select, bindparam, and_  # type: ignore
 
-#time.sleep(10)
-
 # SQLAlchemy doesn't properly understand when you use columns with a "key"
 # property with PostgreSQL's on_conflict_do_update statement, so it prints a
 # pointless warning that we can just ignore.
@@ -26,6 +24,10 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
+
+if os.getenv("TABLE") not in ["flights", "positions"]:
+    raise ValueError(f"Invalid TABLE env variable: {os.getenv("TABLE")} - must be 'flights' or 'positions'")
+
 if os.getenv("TABLE") == "flights":
     table = sa.Table(
         "flights",
@@ -254,7 +256,7 @@ def _flush_flight_cache(conn) -> None:
             # below) for itself, so we need to rename this
             cache_flight["_id"] = cache_flight.pop("id")
             updates.append(cache_flight)
-        # We removed the to-be-updated entrier from the cache, so
+        # We removed the to-be-updated entries from the cache, so
         # insert the rest
         inserts = cache.values()
         # pylint: disable=no-value-for-parameter
