@@ -14,7 +14,7 @@ if [[ $flights_count < 45000 ]]; then
 	exit 1
 fi
 
-if [[ $positions_count < 450000 ]]; then
-	echo "Position count lower than threshold 450000"
+if [[ $positions_count < 400000 ]]; then
+	echo "Position count lower than threshold 400000"
 	exit 1
 fi
