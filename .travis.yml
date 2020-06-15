@@ -52,3 +52,4 @@ jobs:
         - docker-compose up -d --build
       script:
         - ./travis_performance_regression_test.sh
+        
