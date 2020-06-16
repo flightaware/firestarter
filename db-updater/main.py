@@ -26,7 +26,9 @@ TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 meta = sa.MetaData()
 
 if os.getenv("TABLE") not in ["flights", "positions"]:
-    raise ValueError(f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'")
+    raise ValueError(
+        f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'"
+    )
 
 if os.getenv("TABLE") == "flights":
     table = sa.Table(
@@ -35,7 +37,11 @@ if os.getenv("TABLE") == "flights":
         sa.Column("id", sa.String, primary_key=True),
         sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
         sa.Column(
-            "changed", TIMESTAMP_TZ(), nullable=False, server_default=func.now(), onupdate=func.now(),
+            "changed",
+            TIMESTAMP_TZ(),
+            nullable=False,
+            server_default=func.now(),
+            onupdate=func.now(),
         ),
         sa.Column("flight_number", sa.String, key="ident"),
         sa.Column("registration", sa.String, key="reg"),
@@ -177,13 +183,19 @@ def convert_msg_fields(msg: dict) -> dict:
             msg[key] = bool(int(val))
     return msg
 
-def insert(data: dict) -> None:
+
+insert_index = 0
+
+
+def insert_cache(data: dict) -> None:
     """Insert new row into the database"""
+    # pylint: disable=global-statement
+    global insert_index
     converted = convert_msg_fields(data)
     with cache_lock:
-        cache[insert.index].update(converted)
-    insert.index += 1
-insert.index = 0
+        cache[insert_index].update(converted)
+    insert_index += 1
+
 
 def insert_or_update(data: dict) -> None:
     """Insert new row into the database or update an existing row"""
@@ -219,6 +231,7 @@ def flush_cache() -> None:
                 _flush_flight_cache(conn)
             elif os.getenv("TABLE") == "positions":
                 _flush_position_cache(conn)
+
 
 def _flush_flight_cache(conn) -> None:
     print(f"Flushing {len(cache)} new/updated to database")
@@ -271,9 +284,9 @@ def _flush_flight_cache(conn) -> None:
 
 def _flush_position_cache(conn) -> None:
     print(f"Flushing {len(cache)} new entries to table")
-    inserts = cache.values()
     conn.execute(table.insert(), *cache.values())
     cache.clear()
+
 
 def expire_old_from_table() -> None:
     """Wrapper for _expire_old_from_table"""
@@ -338,9 +351,11 @@ def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
     return insert_or_update(data)
 
+
 def process_position_message(data: dict) -> None:
     """Position message type"""
-    return insert(data)
+    return insert_cache(data)
+
 
 def process_keepalive_message(data: dict) -> None:
     """Keepalive message type"""
@@ -365,18 +380,20 @@ def setup_sqlite() -> None:
 
 def main():
     """Read flight updates from kafka and store them into the database"""
-    global attempt_hypertable
-
     exists = False
     if engine.name == "sqlite":
         setup_sqlite()
     if engine.has_table(os.getenv("TABLE")):
-        print(f"{os.getenv('TABLE')} table already exists, clearing expired {os.getenv('TABLE')} before continuing")
+        print(
+            f"{os.getenv('TABLE')} table already exists, \
+            clearing expired {os.getenv('TABLE')} before continuing"
+        )
         _expire_old_from_table()
         exists = True
     meta.create_all(engine)
 
     if attempt_hypertable and not exists:
+        # pylint: disable=broad-except
         try:
             engine.execute("SELECT create_hypertable('positions', 'time')")
         except Exception as error:

@@ -173,6 +173,7 @@ async def print_stats(period: int) -> None:
             lines_read = 0
             bytes_read = 0
 
+
 async def read_firehose(time_mode: str) -> Optional[str]:
     """Open a connection to Firehose and read from it forever,
     passing all messages along to all connected clients.
@@ -186,6 +187,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     "pitr <pitr>" where <pitr> is a value previously returned by this function
     """
     # pylint: disable=global-statement
+    # pylint: disable=too-many-statements
     global last_good_pitr, lines_read, bytes_read
 
     context = ssl.create_default_context()
@@ -232,18 +234,30 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         try:
             if message["type"] == "keepalive":
                 producer.produce(
-                    os.getenv("KAFKA_POSITION_TOPIC_NAME"), key=key, value=line, callback=delivery_report
+                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
+                    key=key,
+                    value=line,
+                    callback=delivery_report,
                 )
                 producer.produce(
-                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"), key=key, value=line, callback=delivery_report
+                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
+                    key=key,
+                    value=line,
+                    callback=delivery_report,
                 )
             elif message["type"] == "position":
                 producer.produce(
-                    os.getenv("KAFKA_POSITION_TOPIC_NAME"), key=key, value=line, callback=delivery_report
+                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
+                    key=key,
+                    value=line,
+                    callback=delivery_report,
                 )
             else:
                 producer.produce(
-                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"), key=key, value=line, callback=delivery_report
+                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
+                    key=key,
+                    value=line,
+                    callback=delivery_report,
                 )
         except BufferError as e:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")

@@ -54,7 +54,7 @@ class TestInsertAndExpire(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree("db")
         try:
-            del sys.modules['main']
+            del sys.modules["main"]
         except KeyError:
             pass
 
@@ -80,6 +80,7 @@ class TestInsertAndExpire(unittest.TestCase):
 
         try:
             import main
+
             main.main()
         except StopIteration:
             pass
@@ -101,9 +102,7 @@ class TestInsertAndExpire(unittest.TestCase):
         if end_empty:
             self.assertEqual(expired_rows_in_table.fetchall(), [])
         else:
-            self.assertEqual(
-                expired_rows_in_table.fetchall(), expected_table_results
-            )
+            self.assertEqual(expired_rows_in_table.fetchall(), expected_table_results)
 
     @patch.dict("os.environ", {"DB_URL": "sqlite:///db/flights.db", "TABLE": "flights"})
     @patch("main.timedelta")
@@ -123,7 +122,9 @@ class TestInsertAndExpire(unittest.TestCase):
     @patch("main.timedelta")
     @patch("main.threading.Thread")
     @patch("main.Consumer")
-    def test_insert_positions_then_expire_msgs(self, mock_kafkaconsumer, mock_thread, mock_timedelta):
+    def test_insert_positions_then_expire_msgs(
+        self, mock_kafkaconsumer, mock_thread, mock_timedelta
+    ):
         mock_timedelta.side_effect = self.no_timedelta
         self.run_and_check_table(1, "positions", mock_kafkaconsumer)
 
