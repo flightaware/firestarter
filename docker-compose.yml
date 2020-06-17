@@ -94,7 +94,7 @@ services:
     environment:
       # URL to database that will be updated based on Firehose contents.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
-      - DB_URL=${POSITION_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
       - KAFKA_TOPIC_NAME=position_feed1
@@ -125,8 +125,10 @@ services:
     environment:
       # URL to database that is being updated by db-updater.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
-      - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
+      - FLIGHTS_DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
+      - POSITIONS_DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
       - PYTHONUNBUFFERED=1
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:?GOOGLE_MAPS_API_KEY variable must be set}
     volumes:
       - data:/home/firestarter/app/db
     logging:
