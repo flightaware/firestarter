@@ -9,7 +9,11 @@ export default class FlightInfo extends Component {
 
         this.state = {
             data: {},
-            loading: true
+            positions: {},
+            api_key: "",
+            loading_flight: true,
+            loading_positions: true,
+            loading_api_key: true,
         }
     }
 
@@ -18,6 +22,8 @@ export default class FlightInfo extends Component {
         const { match: { params } } = this.props;
 
         this.fetchFlightInfo(params.flight);
+        this.fetchPositions(params.flight);
+        this.fetchApiKey();
 
         console.log(params.flight);
 
@@ -28,15 +34,39 @@ export default class FlightInfo extends Component {
             .then(response => {
                 console.log(response.data)
                 this.setState({
-                    loading: false,
+                    loading_flight: false,
                     data: response.data
+                });
+            });
+    }
+
+    fetchPositions(flightID) {
+        if (flightID) {
+            axios.get(`/positions/${flightID}`)
+                .then(response => {
+                    console.log(response)
+                    this.setState({
+                        loading_positions: false,
+                        positions: response.data
+                    });
+                });
+        }
+    }
+
+    fetchApiKey() {
+        axios.get(`/google_maps_api_key/`)
+            .then(response => {
+                console.log(response.data)
+                this.setState({
+                    loading_api_key: false,
+                    api_key: response.data
                 });
             });
     }
 
     render() {
         
-        const { data, loading } = this.state;
+        const { data, positions, api_key, loading_flight, loading_positions, loading_api_key } = this.state;
 
         
 
@@ -107,10 +137,21 @@ export default class FlightInfo extends Component {
             }
         }
 
+        const getMapImage = () => {
+            var latlon = ""
+            for(var i = 0; i < positions.length; i++) {
+                var obj = positions[i];
+                latlon +=  "|" + obj.latitude + "," + obj.longitude
+            }
+            console.log(api_key);
+            console.log(latlon);
+            return <div className="d-flex align-items-center"><img src={`https://maps.googleapis.com/maps/api/staticmap?size=400x400&path=color:0x0000ff|weight:5${latlon}&key=${api_key}`}/></div>
+        }
+
         return (
             <Container className="flight-info-wrapper">
                 {
-                !loading ?
+                !loading_flight ?
                     <>
                     <Container className="p-3 flight-number">
                         <Row lg={3}>
@@ -161,6 +202,9 @@ export default class FlightInfo extends Component {
                             </Col>
                         </Row>
                     </Container>
+                    {!loading_positions && !loading_api_key ?
+                    <div className="d-flex justify-content-center">{getMapImage()}</div>
+                    : <Container></Container>}
                     <Container>
                         <Card className="detail-card">
                             <Row className="detail-card-title">
