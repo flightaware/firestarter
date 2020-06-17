@@ -9,14 +9,23 @@ import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 
 # pylint: disable=invalid-name
-engine = sa.create_engine(os.getenv("DB_URL"), echo=True)
-meta = sa.MetaData()
-insp = sa.inspect(engine)
-while "flights" not in insp.get_table_names():
+flights_engine = sa.create_engine(os.getenv("FLIGHTS_DB_URL"), echo=True)
+flights_meta = sa.MetaData()
+flights_insp = sa.inspect(flights_engine)
+while "flights" not in flights_insp.get_table_names():
     print("Waiting for flights table to exist before starting")
-    insp.info_cache.clear()
+    flights_insp.info_cache.clear()
     time.sleep(3)
-flights = sa.Table("flights", meta, autoload_with=engine)
+flights = sa.Table("flights", flights_meta, autoload_with=flights_engine)
+
+positions_engine = sa.create_engine(os.getenv("POSITIONS_DB_URL"), echo=True)
+positions_meta = sa.MetaData()
+positions_insp = sa.inspect(positions_engine)
+while "positions" not in positions_insp.get_table_names():
+    print("Waiting for positions table to exist before starting")
+    positions_insp.info_cache.clear()
+    time.sleep(3)
+positions = sa.Table("positions", positions_meta, autoload_with=positions_engine)
 
 app = Flask(__name__, template_folder="frontend/build", static_folder="frontend/build/static")
 # Uncomment to enable serving the frontend separately (when testing, perhaps)
@@ -34,6 +43,20 @@ def catch_all(path):
     return render_template("index.html")
 
 
+@app.route("/google_maps_api_key/")
+def google_maps_api_key() -> str:
+    print(os.getenv("GOOGLE_MAPS_API_KEY"))
+    return os.getenv("GOOGLE_MAPS_API_KEY")
+
+@app.route("/positions/<flight_id>")
+def get_positions(flight_id: Optional[str]) -> dict:
+    """Get positions for a specific flight_id"""
+    result = positions_engine.execute(positions.select().where(positions.c.id == flight_id).order_by(positions.c.time))
+    if result is None:
+        abort(404)
+    return jsonify([dict(e) for e in result])
+
+
 @app.route("/flights/")
 @app.route("/flights/<flight_id>")
 def get_flight(flight_id: Optional[str] = None) -> dict:
@@ -48,7 +71,7 @@ def get_flight(flight_id: Optional[str] = None) -> dict:
         )
     else:
         whereclause = flights.c.id == flight_id
-    result = engine.execute(flights.select().where(whereclause)).first()
+    result = flights_engine.execute(flights.select().where(whereclause)).first()
     if result is None:
         abort(404)
     return dict(result)
@@ -61,7 +84,7 @@ def get_busiest_airports() -> Response:
     since = datetime.fromtimestamp(int(request.args.get("since", 0)), tz=UTC)
     query = request.args.get("query")
     if query:
-        result = engine.execute(
+        result = flights_engine.execute(
             union(
                 select([flights.c.origin]).distinct().where(flights.c.origin.like(f"%{query}%")),
                 select([flights.c.destination])
@@ -76,7 +99,7 @@ def get_busiest_airports() -> Response:
     return jsonify(
         [
             row.origin
-            for row in engine.execute(
+            for row in flights_engine.execute(
                 select([flights.c.origin])
                 .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) > since)
                 .group_by(flights.c.origin)
@@ -92,7 +115,7 @@ def airport_arrivals(airport: str) -> Response:
     """Get a list of arrivals for a certain airport"""
     airport = airport.upper()
     dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
-    result = engine.execute(
+    result = flights_engine.execute(
         flights.select().where(
             and_(
                 flights.c.destination == airport,
@@ -113,7 +136,7 @@ def airport_departures(airport: str) -> Response:
     """Get a list of departures for a certain airport"""
     airport = airport.upper()
     dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
-    result = engine.execute(
+    result = flights_engine.execute(
         flights.select().where(
             and_(
                 flights.c.origin == airport,
@@ -135,7 +158,7 @@ def airport_enroute(airport: str) -> Response:
     airport = airport.upper()
     past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)
-    result = engine.execute(
+    result = flights_engine.execute(
         flights.select().where(
             and_(
                 flights.c.destination == airport,
@@ -158,7 +181,7 @@ def airport_scheduled(airport: str) -> Response:
     airport = airport.upper()
     past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)
-    result = engine.execute(
+    result = flights_engine.execute(
         flights.select().where(
             and_(
                 flights.c.origin == airport,
