@@ -2,7 +2,7 @@
 
 start=$(date +%s)
 
-sleep 5m
+sleep 300
 
 flights_count=$(docker exec -it $(docker ps | grep firestarter_db-updater_1 | awk 'NF>1{print $NF}') sqlite3 /home/firestarter/app/db/flights.db 'SELECT COUNT(*) FROM flights')
 
@@ -20,11 +20,11 @@ if [[ $flights_count < 45000 ]]; then
 	exit 1
 fi
 
-if [[ $positions_count < 400000 ]]; then
-	echo "Position count lower than threshold 400000"
+if [[ $positions_count < 200000 ]]; then
+	echo "Position count lower than threshold 200000"
 	exit 1
 fi
 
-echo "Position catch-up rate: x$((${positions_time_processed}.0 / ($end - $start)))"
+echo "Position catch-up rate: x$(($positions_time_processed / ($end - $start)))"
 
 exit 0
