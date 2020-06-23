@@ -18,3 +18,5 @@ if [[ $positions_count < 400000 ]]; then
 	echo "Position count lower than threshold 400000"
 	exit 1
 fi
+
+exit 0
