@@ -10,6 +10,7 @@ import time
 import traceback
 import warnings
 from typing import Optional, Generator, KeysView
+from abc import ABC, abstractmethod
 
 from confluent_kafka import KafkaException, Consumer  # type: ignore
 import sqlalchemy as sa  # type: ignore
@@ -24,13 +25,14 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
+TABLE = os.getenv("TABLE")
 
-if os.getenv("TABLE") not in ["flights", "positions"]:
+if TABLE not in ["flights", "positions"]:
     raise ValueError(
         f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'"
     )
 
-if os.getenv("TABLE") == "flights":
+if TABLE == "flights":
     table = sa.Table(
         "flights",
         meta,
@@ -84,21 +86,48 @@ if os.getenv("TABLE") == "flights":
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
     )
-elif os.getenv("TABLE") == "positions":
+elif TABLE == "positions":
     table = sa.Table(
         "positions",
         meta,
-        sa.Column("id", sa.String, key="id"),
+        sa.Column("id", sa.String, primary_key=True),
         sa.Column("added", TIMESTAMP_TZ(), nullable=False, server_default=func.now()),
-        sa.Column("time", TIMESTAMP_TZ(), nullable=False, key="clock"),
-        sa.Column("latitude", sa.String, key="lat"),
-        sa.Column("longitude", sa.String, key="lon"),
+        sa.Column("time", TIMESTAMP_TZ(), nullable=False, key="clock", primary_key=True),
+        sa.Column("latitude", sa.String, key="lat", primary_key=True),
+        sa.Column("longitude", sa.String, key="lon", primary_key=True),
+        sa.Column("facility_hash", sa.String),
+        sa.Column("facility_name", sa.String),
+        sa.Column("update_type", sa.String, key="updateType"),
+        sa.Column("adsb_version", sa.Integer),
+        sa.Column("aircraft_type", sa.String, key="aircrafttype"),
         sa.Column("altitude", sa.Integer, key="alt"),
+        sa.Column("gnss_altitude", sa.Integer, key="alt_gnss"),
+        sa.Column("altitude_change", sa.String, key="altChange"),
+        sa.Column("atc_ident", sa.String, key="atcident"),
+        sa.Column("registration", sa.String, key="reg"),
+        sa.Column("origin", sa.String, key="orig"),
+        sa.Column("destination", sa.String, key="dest"),
+        sa.Column("estimated_departure_time", sa.Integer, key="edt"),
+        sa.Column("estimated_arrival_time", sa.Integer, key="eta"),
+        sa.Column("enroute_time", sa.Integer, key="ete"),
         sa.Column("groundspeed", sa.Integer, key="gs"),
-        sa.Column("heading", sa.String, key="heading"),
+        sa.Column("heading", sa.String),
         sa.Column("magnetic_heading", sa.String, key="heading_magnetic"),
         sa.Column("true_heading", sa.String, key="heading_true"),
+        sa.Column("hexid", sa.String),
         sa.Column("mach_number", sa.String, key="mach"),
+        sa.Column("nac_p", sa.Integer),
+        sa.Column("nac_v", sa.Integer),
+        sa.Column("nav_altitude", sa.Integer),
+        sa.Column("nav_heading", sa.String),
+        sa.Column("nav_modes", sa.String),
+        sa.Column("nav_altimiter_setting", sa.String, key="nav_qnh"),
+        sa.Column("nic", sa.Integer),
+        sa.Column("nic_baro", sa.Integer),
+        sa.Column("radius_of_containment", sa.Integer, key="pos_rc"),
+        sa.Column("sil", sa.Integer),
+        sa.Column("sil_type", sa.String),
+        sa.Column("route", sa.String),
         sa.Column("air_pressure", sa.Integer, key="pressure"),
         sa.Column("filed_cruising_speed", sa.Integer, key="speed"),
         sa.Column("indicated_airspeed", sa.Integer, key="speed_ias"),
@@ -106,9 +135,12 @@ elif os.getenv("TABLE") == "positions":
         sa.Column("squawk", sa.Integer),
         sa.Column("temperature", sa.Integer),
         sa.Column("temperature_quality", sa.Integer),
+        sa.Column("waypoints", sa.String),
+        sa.Column("vertical_rate", sa.Integer, key="vertRate"),
+        sa.Column("geometric_vertical_rate", sa.Integer, key="vertRate_geom"),
         sa.Column("wind_direction", sa.Integer, key="wind_dir"),
-        sa.Column("wind_quality", sa.Integer, key="wind_quality"),
-        sa.Column("wind_speed", sa.Integer, key="wind_speed"),
+        sa.Column("wind_quality", sa.Integer),
+        sa.Column("wind_speed", sa.Integer),
     )
 
 engine_args: dict = {}
@@ -116,9 +148,6 @@ db_url: str = os.getenv("DB_URL")  # type: ignore
 
 attempt_hypertable = 0
 if "postgresql" in db_url:
-    # Wait 10 seconds to wait for postgres to come up
-    time.sleep(10)
-
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
     # performance even more.
@@ -136,6 +165,15 @@ elif "sqlite" in db_url:
 
 engine = sa.create_engine(db_url, **engine_args)
 
+# Make sure that we can connect to the DB
+while True:
+    try:
+        engine.connect()
+        break
+    except sa.exc.OperationalError as error:
+        print(f"Can't connect to the database ({error}), trying again in a few seconds")
+        time.sleep(3)
+
 # Columns in the table that we'll explicitly be setting
 MSG_TABLE_COLS = {c for c in table.c if c.server_default is None}
 # The keys in a message that we want in the table
@@ -149,22 +187,128 @@ cache_lock = threading.Lock()
 # received data) to ensure proper behavior of executemany-style SQLAlchemy
 # statements.
 # https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
-cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
 
 SQLITE_VAR_LIMIT = None
 
 
-@sa.event.listens_for(engine, "begin")
-def do_begin(conn: sa.engine.Transaction) -> None:
-    """emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
-    error if we happen to expire entries in the table between the flush_cache thread's
-    read and write (more info about how this can occur:
-    https://www.sqlite.org/rescode.html#busy_snapshot)
-    """
-    if engine.name != "sqlite":
-        return
+class Cache(ABC):
+    """Cache definition"""
 
-    conn.execute("BEGIN IMMEDIATE")
+    @abstractmethod
+    def __init__(self, _table):
+        """Initialize cache"""
+        ...
+
+    @abstractmethod
+    def add(self, data: dict) -> None:
+        """Insert new row into the cache"""
+        ...
+
+    @abstractmethod
+    def flush(self, conn) -> None:
+        """Flush cache to the database"""
+        ...
+
+
+class Position_Cache(Cache):
+    """Position Cache Operations"""
+
+    # pylint: disable=super-init-not-called
+    def __init__(self, _table):
+        """Initialize cache as a list"""
+        self.cache = []
+        self.table = _table
+
+    def add(self, data: dict) -> None:
+        """Insert new row into the cache"""
+        insert_data = dict.fromkeys(MSG_TABLE_KEYS)
+        insert_data.update(data)
+        self.cache.append(insert_data)
+
+    def flush(self, conn) -> None:
+        """Flush cache to the database"""
+        if not self.cache:
+            return
+
+        print(f"Flushing {len(self.cache)} new positions to table")
+        conn.execute(self.table.insert(), *self.cache)
+        self.cache.clear()
+
+
+class Flight_Cache(Cache):
+    """Flight Cache Operations"""
+
+    # pylint: disable=super-init-not-called
+    def __init__(self, _table):
+        """Initialize cache as a dict"""
+        self.cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
+        self.table = _table
+
+    def add(self, data: dict) -> None:
+        """Insert new row into the cache or update an existing row"""
+        self.cache[data["id"]].update(data)
+
+    def flush(self, conn) -> None:
+        """Flush cache to the database"""
+        if not self.cache:
+            return
+
+        print(f"Flushing {len(self.cache)} new/updated flights to database")
+        if engine.name == "postgresql":
+            # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
+            # pylint: disable=import-outside-toplevel
+            from sqlalchemy.dialects.postgresql import insert  # type: ignore
+
+            statement = insert(self.table)
+            # This builds the "SET ?=?" part of the update statement,
+            # making sure to keep the row's current values if they're
+            # non-null and the new row's are null
+            col_updates = {
+                c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS
+            }
+            # on_conflict_do_update won't handle Columns with onupdate set.
+            # Have to do it ourselves.
+            # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
+            col_updates["changed"] = func.now()
+            statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
+            conn.execute(statement, *self.cache.values())
+        else:
+            updates = []
+            # Get all rows from database that will need updating. Parameter
+            # list is chunked as needed to prevent overrunning sqlite
+            # limits: https://www.sqlite.org/limits.html#max_variable_number
+            id_chunks = chunk(self.cache.keys(), SQLITE_VAR_LIMIT)
+            existing = chain.from_iterable(
+                conn.execute(select([self.table]).where(self.table.c.id.in_(keys)))
+                for keys in id_chunks
+            )
+            for flight in existing:
+                cache_flight = self.cache.pop(flight["id"])
+                for k in cache_flight:
+                    if cache_flight[k] is None:
+                        cache_flight[k] = flight[k]
+                # SQLAlchemy reserves column names in bindparam (used
+                # below) for itself, so we need to rename this
+                cache_flight["_id"] = cache_flight.pop("id")
+                updates.append(cache_flight)
+            # We removed the to-be-updated flights from the cache, so
+            # insert the rest
+            inserts = self.cache.values()
+            # pylint: disable=no-value-for-parameter
+            if updates:
+                conn.execute(
+                    self.table.update().where(self.table.c.id == bindparam("_id")), *updates,
+                )
+            if inserts:
+                conn.execute(self.table.insert(), *inserts)
+        self.cache.clear()
+
+
+cache: Cache
+if TABLE == "flights":
+    cache = Flight_Cache(table)
+elif TABLE == "positions":
+    cache = Position_Cache(table)
 
 
 def convert_msg_fields(msg: dict) -> dict:
@@ -184,24 +328,17 @@ def convert_msg_fields(msg: dict) -> dict:
     return msg
 
 
-insert_index = 0
+@sa.event.listens_for(engine, "begin")
+def do_begin(conn: sa.engine.Transaction) -> None:
+    """emit our own BEGIN, and make it immediate so we don't get a SQLITE_BUSY
+    error if we happen to expire entries in the table between the flush_cache thread's
+    read and write (more info about how this can occur:
+    https://www.sqlite.org/rescode.html#busy_snapshot)
+    """
+    if engine.name != "sqlite":
+        return
 
-
-def insert_cache(data: dict) -> None:
-    """Insert new row into the database"""
-    # pylint: disable=global-statement
-    global insert_index
-    converted = convert_msg_fields(data)
-    with cache_lock:
-        cache[insert_index].update(converted)
-    insert_index += 1
-
-
-def insert_or_update(data: dict) -> None:
-    """Insert new row into the database or update an existing row"""
-    converted = convert_msg_fields(data)
-    with cache_lock:
-        cache[converted["id"]].update(converted)
+    conn.execute("BEGIN IMMEDIATE")
 
 
 def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
@@ -220,72 +357,19 @@ def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
         yield from [values]
 
 
+def add_to_cache(data: dict) -> None:
+    """add entry to the cache"""
+    converted = convert_msg_fields(data)
+    with cache_lock:
+        cache.add(converted)
+
+
 def flush_cache() -> None:
     """Add info into the database table"""
     while not finished.is_set():
         finished.wait(2)
         with cache_lock, engine.begin() as conn:
-            if not cache:
-                continue
-            if os.getenv("TABLE") == "flights":
-                _flush_flight_cache(conn)
-            elif os.getenv("TABLE") == "positions":
-                _flush_position_cache(conn)
-
-
-def _flush_flight_cache(conn) -> None:
-    print(f"Flushing {len(cache)} new/updated to database")
-    if engine.name == "postgresql":
-        # Use postgresql's "ON CONFLICT UPDATE" statement to simplify logic
-        # pylint: disable=import-outside-toplevel
-        from sqlalchemy.dialects.postgresql import insert  # type: ignore
-
-        statement = insert(table)
-        # This builds the "SET ?=?" part of the update statement,
-        # making sure to keep the row's current values if they're
-        # non-null and the new row's are null
-        col_updates = {c.name: func.coalesce(statement.excluded[c.key], c) for c in MSG_TABLE_COLS}
-        # on_conflict_do_update won't handle Columns with onupdate set.
-        # Have to do it ourselves.
-        # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_update
-        col_updates["changed"] = func.now()
-        statement = statement.on_conflict_do_update(index_elements=["id"], set_=col_updates)
-        conn.execute(statement, *cache.values())
-    else:
-        updates = []
-        # Get all rows from database that will need updating. Parameter
-        # list is chunked as needed to prevent overrunning sqlite
-        # limits: https://www.sqlite.org/limits.html#max_variable_number
-        id_chunks = chunk(cache.keys(), SQLITE_VAR_LIMIT)
-        existing = chain.from_iterable(
-            conn.execute(select([table]).where(table.c.id.in_(keys))) for keys in id_chunks
-        )
-        for flight in existing:
-            cache_flight = cache.pop(flight["id"])
-            for k in cache_flight:
-                if cache_flight[k] is None:
-                    cache_flight[k] = flight[k]
-            # SQLAlchemy reserves column names in bindparam (used
-            # below) for itself, so we need to rename this
-            cache_flight["_id"] = cache_flight.pop("id")
-            updates.append(cache_flight)
-        # We removed the to-be-updated entries from the cache, so
-        # insert the rest
-        inserts = cache.values()
-        # pylint: disable=no-value-for-parameter
-        if updates:
-            conn.execute(
-                table.update().where(table.c.id == bindparam("_id")), *updates,
-            )
-        if inserts:
-            conn.execute(table.insert(), *inserts)
-    cache.clear()
-
-
-def _flush_position_cache(conn) -> None:
-    print(f"Flushing {len(cache)} new entries to table")
-    conn.execute(table.insert(), *cache.values())
-    cache.clear()
+            cache.flush(conn)
 
 
 def expire_old_from_table() -> None:
@@ -316,45 +400,45 @@ def process_unknown_message(data: dict) -> None:
 
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_cancellation_message(data: dict) -> None:
     """Cancel message type"""
     data["cancelled"] = data["pitr"]
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_departure_message(data: dict) -> None:
     """Departure message type"""
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_offblock_message(data: dict) -> None:
     """Offblock message type"""
     data["actual_out"] = data["clock"]
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
     data["actual_in"] = data["clock"]
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_extended_flight_info_message(data: dict) -> None:
     """extendedFlightInfo message type"""
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
-    return insert_or_update(data)
+    return add_to_cache(data)
 
 
 def process_position_message(data: dict) -> None:
     """Position message type"""
-    return insert_cache(data)
+    return add_to_cache(data)
 
 
 def process_keepalive_message(data: dict) -> None:
@@ -383,7 +467,7 @@ def main():
     exists = False
     if engine.name == "sqlite":
         setup_sqlite()
-    if engine.has_table(os.getenv("TABLE")):
+    if engine.has_table(TABLE):
         print(
             f"{os.getenv('TABLE')} table already exists, \
             clearing expired {os.getenv('TABLE')} before continuing"
@@ -397,7 +481,7 @@ def main():
         try:
             engine.execute("SELECT create_hypertable('positions', 'time')")
         except Exception as error:
-            print("Could not create hypertable")
+            print(f"Could not create hypertable: {error}")
 
     processor_functions = {
         "arrival": process_arrival_message,
