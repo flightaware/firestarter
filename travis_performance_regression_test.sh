@@ -8,7 +8,7 @@ flights_count=$(docker exec -it $(docker ps | grep firestarter_db-updater_1 | aw
 
 positions_count=$(docker exec -it $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT COUNT(*) FROM positions')
 
-positions_time_processed=$(docker exec -it $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT MAX(extract(epoch from time)) - 1577880000 as time_diff FROM positions' | tr -d '\r')
+positions_time_processed=$(docker exec -it $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT MAX(extract(epoch from time)) - MIN(extract(epoch from time)) as time_diff FROM positions' | tr -d '\r')
 
 end=$(date +%s)
 
