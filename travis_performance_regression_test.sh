@@ -25,6 +25,6 @@ if [[ $positions_count < 400000 ]]; then
 	exit 1
 fi
 
-echo "Position catch-up rate: $((${positions_time_processed}.0 / ($end - $start)))"
+echo "Position catch-up rate: x$((${positions_time_processed}.0 / ($end - $start)))"
 
 exit 0
