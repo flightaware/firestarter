@@ -233,28 +233,14 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         key = message.get("id", "").encode() or None
         try:
             if message["type"] == "keepalive":
-                producer.produce(
-                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
-                    key=key,
-                    value=line,
-                    callback=delivery_report,
-                )
-                producer.produce(
-                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
-                    key=key,
-                    value=line,
-                    callback=delivery_report,
-                )
+                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME"), os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
             elif message["type"] == "position":
-                producer.produce(
-                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
-                    key=key,
-                    value=line,
-                    callback=delivery_report,
-                )
+                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME")]
             else:
+                topics = [os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+            for topic in topics:
                 producer.produce(
-                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
+                    topic,
                     key=key,
                     value=line,
                     callback=delivery_report,
