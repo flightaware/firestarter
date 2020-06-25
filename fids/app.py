@@ -19,6 +19,15 @@ while "flights" not in flights_insp.get_table_names():
 flights = sa.Table("flights", flights_meta, autoload_with=flights_engine)
 
 positions_engine = sa.create_engine(os.getenv("POSITIONS_DB_URL"), echo=True)
+
+while True:
+    try:
+        positions_engine.connect()
+        break
+    except sa.exc.OperationalError as error:
+        print(f"Can't connect to the database ({error}), trying again in a few seconds")
+        time.sleep(3)
+
 positions_meta = sa.MetaData()
 positions_insp = sa.inspect(positions_engine)
 while "positions" not in positions_insp.get_table_names():
@@ -51,7 +60,7 @@ def google_maps_api_key() -> str:
 @app.route("/positions/<flight_id>")
 def get_positions(flight_id: Optional[str]) -> dict:
     """Get positions for a specific flight_id"""
-    result = positions_engine.execute(positions.select().where(positions.c.id == flight_id).order_by(positions.c.time))
+    result = positions_engine.execute(positions.select().where(positions.c.id == flight_id).order_by(positions.c.time.desc()))
     if result is None:
         abort(404)
     return jsonify([dict(e) for e in result])
