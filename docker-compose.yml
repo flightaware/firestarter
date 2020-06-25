@@ -128,7 +128,7 @@ services:
       - FLIGHTS_DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - POSITIONS_DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
       - PYTHONUNBUFFERED=1
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:?GOOGLE_MAPS_API_KEY variable must be set}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
     volumes:
       - data:/home/firestarter/app/db
     logging:

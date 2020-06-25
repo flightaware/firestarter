@@ -215,7 +215,7 @@ export default class FlightInfo extends Component {
                             </Col>
                         </Row>
                     </Container>
-                    {!loading_positions && !loading_api_key ?
+                    {!loading_positions && !loading_api_key && api_key != "" ?
                     <div className="d-flex justify-content-center">{getMapImage()}</div>
                     : <Container></Container>}
                     <Container>
