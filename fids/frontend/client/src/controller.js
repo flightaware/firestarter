@@ -5,6 +5,9 @@ export const minuteZeroes = (num) => {
 }
 
 export const makeTime = (time) => {
+    if (isNaN(time)) {
+        return "";
+    }
     let millis = new Date(time);
     let hours = millis.getUTCHours();
     let minutes = millis.getMinutes();
@@ -58,13 +61,10 @@ export const getArrivalGate = (flight) => {
 }
 
 export const isCancelled = (flight) => {
-    if (flight.cancelled != null && flight.actual_out === null) {
-        // is it a true cancel?
-        if (flight.true_cancel !== null) {
-            if (flight.true_cancel) {
-                // true cancel
-                return "tc"
-            }
+    if (flight.cancelled) {
+        if (flight.true_cancel) {
+            // true cancel
+            return "tc"
         }
         // estimated cancel
         return "ec"

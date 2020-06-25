@@ -51,7 +51,10 @@ export default class DeparturesTable extends Component {
                             cellStyle: {
                                 fontFamily: 'Helvetica-Light',
                                 padding: '10px',
-                            }
+                            },
+                            rowStyle: rowData => ({
+                                backgroundColor: rowData.cancelled ? '#FF000055' : '#00000000'
+                            })
                         }}
                         columns={[
                             {
@@ -93,7 +96,8 @@ export default class DeparturesTable extends Component {
                                 depart: FS.getDepartureTime(flight).time, 
                                 arrive: FS.getArrivalTime(flight).time,
                                 baggage: flight.baggage_claim,
-                                gate: FS.getDepartureGate(flight)
+                                gate: FS.getDepartureGate(flight),
+                                cancelled: flight.cancelled
                             } 
                         ))}
                     />
