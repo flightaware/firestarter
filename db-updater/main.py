@@ -210,14 +210,15 @@ class Cache(ABC):
         ...
 
 
-class Position_Cache(Cache):
+class PositionCache(Cache):
     """Position Cache Operations"""
 
-    # pylint: disable=super-init-not-called
-    def __init__(self, _table):
+    # pylint: disable=redefined-outer-name
+    def __init__(self, table):
         """Initialize cache as a list"""
+        super().__init__(self)
         self.cache = []
-        self.table = _table
+        self.table = table
 
     def add(self, data: dict) -> None:
         """Insert new row into the cache"""
@@ -235,14 +236,15 @@ class Position_Cache(Cache):
         self.cache.clear()
 
 
-class Flight_Cache(Cache):
+class FlightCache(Cache):
     """Flight Cache Operations"""
 
-    # pylint: disable=super-init-not-called
-    def __init__(self, _table):
+    # pylint: disable=redefined-outer-name
+    def __init__(self, table):
         """Initialize cache as a dict"""
+        super().__init__(self)
         self.cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
-        self.table = _table
+        self.table = table
 
     def add(self, data: dict) -> None:
         """Insert new row into the cache or update an existing row"""
@@ -306,9 +308,9 @@ class Flight_Cache(Cache):
 
 cache: Cache
 if TABLE == "flights":
-    cache = Flight_Cache(table)
+    cache = FlightCache(table)
 elif TABLE == "positions":
-    cache = Position_Cache(table)
+    cache = PositionCache(table)
 
 
 def convert_msg_fields(msg: dict) -> dict:
