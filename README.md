@@ -55,13 +55,16 @@ The connector then forwards Firehose messages to its own clients.
 
 ### db-updater
 The db-updater service receives Firehose messages from the connector and
-maintains a database table of flights based on their contents. The service is
-only capable of handling so-called "flifo" (flight info) messages currently; in
-the future, position messages will also be handled. The default database
-configuration writes to a sqlite database in a named volume, but PostgreSQL is
-also supported. Other databases could potentially be supported with little
-effort. To prevent bloat, flights older than 48 hours are automatically
-dropped from the table.
+maintains a database table based on their contents. The service is capable of
+handling so-called "flifo" (flight info) messages and airborn position messages.
+There are two db-updaters currently running - one handles flight info and
+updates a "flights" table, and the other handles airborn positions and updates
+a "positions" table. The default database configuration writes to a sqlite
+database in a named volume, but PostgreSQL is also supported. The flight info
+db-updater uses sqlite, and the position db-updater user TimescaleDB which is
+based on PostgreSQL. Other databases could potentially be supported with little
+effort. To prevent bloat, flights and positions older than 48 hours are
+automatically dropped from the table.
 
 ### fids
 The sample application is a webapp backed by the flights database. You can use
@@ -71,6 +74,23 @@ for individual flights can also be viewed. While the 2 services are intended to
 be used in a production environment, this sample application should only be
 considered a demonstration of what can be built using the data from Firehose.
 It should *not* be used in a production environment.
+
+### fids with Google Maps
+Now, you can see positions displayed on a static Google Maps image on each
+flight info page! In order to enable this feature, you need to configure your
+own google maps API key.
+Instructions:
+https://developers.google.com/maps/documentation/maps-static/get-api-key
+Once you get your API key, just specify it in your .env file as
+GOOGLE_MAPS_API_KEY. Then you will see static maps with a flight track on your
+flight info pages. Note that you may need to enter your payment information.
+The google maps API is not free, but it is with limited use.
+Pricing information:
+https://developers.google.com/maps/documentation/maps-static/usage-and-billing
+You can see that you currently get "a $200 USD Google Maps Platform credit"
+each month, and each query 0-100,000 is 0.002 USD each. So that means that you
+will get 100,000 free queries per month. Since this is a demo and not meant for
+production, that should be fine.
 
 ### kafka/zookeeper
 We are using kafka as a message queue between the connector and the db-updater.
@@ -95,7 +115,6 @@ be sure to provide a group name to store the last offset. Consumers with
 different group names will each consume all messages in a given topic, and
 consumers with the same group name will split messages from that topic between
 them.
-
 
 Check out [the roadmap](./ROADMAP.md) to see what components are coming in the
 future!
