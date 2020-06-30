@@ -7,7 +7,14 @@ import unittest
 from unittest.mock import patch, Mock
 import datetime
 
-env = patch.dict("os.environ", {"FLIGHTS_DB_URL": "sqlite:///test/db/flights.db", "POSITIONS_DB_URL": "sqlite:///test/db/positions.db", "GOOGLE_MAPS_API_KEY": "TEST_KEY"})
+env = patch.dict(
+    "os.environ",
+    {
+        "FLIGHTS_DB_URL": "sqlite:///test/db/flights.db",
+        "POSITIONS_DB_URL": "sqlite:///test/db/positions.db",
+        "GOOGLE_MAPS_API_KEY": "TEST_KEY",
+    },
+)
 # with env, patch('flask.Flask') as mock_flask:
 from flask import Flask
 

@@ -54,13 +54,16 @@ def catch_all(path):
 
 @app.route("/google_maps_api_key/")
 def google_maps_api_key() -> str:
-    print(os.getenv("GOOGLE_MAPS_API_KEY"))
-    return os.getenv("GOOGLE_MAPS_API_KEY")
+    """Get the GOOGLE_MAPS_API_KEY that was provided in the .env file"""
+    return os.getenv("GOOGLE_MAPS_API_KEY", "")
+
 
 @app.route("/positions/<flight_id>")
-def get_positions(flight_id: Optional[str]) -> dict:
+def get_positions(flight_id: str) -> dict:
     """Get positions for a specific flight_id"""
-    result = positions_engine.execute(positions.select().where(positions.c.id == flight_id).order_by(positions.c.time.desc()))
+    result = positions_engine.execute(
+        positions.select().where(positions.c.id == flight_id).order_by(positions.c.time.desc())
+    )
     if result is None:
         abort(404)
     return jsonify([dict(e) for e in result])
