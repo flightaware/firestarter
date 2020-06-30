@@ -35,7 +35,8 @@ class TestReconnect(unittest.TestCase):
                 "INIT_CMD_TIME": "live",
                 "SERVER": "testserver",
                 "PRINT_STATS_PERIOD": "0",
-                "KAFKA_TOPIC_NAME": "topic1",
+                "KAFKA_FLIFO_TOPIC_NAME": "topic1",
+                "KAFKA_POSITION_TOPIC_NAME": "topic2",
             },
         )
         self.mock_reader = Mock()
@@ -61,7 +62,7 @@ class TestReconnect(unittest.TestCase):
             self.mock_reader.readline.coro.side_effect = [error]
         else:
             self.mock_reader.readline.coro.side_effect = [
-                b'{"pitr":"1584126630","type":"position","id":"KPVD-1588929046-hexid-ADF994"}',
+                b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                 error,
             ]
         mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
@@ -94,7 +95,7 @@ class TestReconnect(unittest.TestCase):
             mock_kafkaproducer.return_value.produce.assert_called_once_with(
                 "topic1",
                 key=b"KPVD-1588929046-hexid-ADF994",
-                value=b'{"pitr":"1584126630","type":"position","id":"KPVD-1588929046-hexid-ADF994"}',
+                value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                 callback=ANY,
             )
 

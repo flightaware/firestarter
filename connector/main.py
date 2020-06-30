@@ -187,6 +187,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     "pitr <pitr>" where <pitr> is a value previously returned by this function
     """
     # pylint: disable=global-statement
+    # pylint: disable=too-many-statements
     global last_good_pitr, lines_read, bytes_read
 
     context = ssl.create_default_context()
@@ -231,9 +232,19 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
         key = message.get("id", "").encode() or None
         try:
-            producer.produce(
-                os.getenv("KAFKA_TOPIC_NAME"), key=key, value=line, callback=delivery_report
-            )
+            if message["type"] == "keepalive":
+                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME"), os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+            elif message["type"] == "position":
+                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME")]
+            else:
+                topics = [os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+            for topic in topics:
+                producer.produce(
+                    topic,
+                    key=key,
+                    value=line,
+                    callback=delivery_report,
+                )
         except BufferError as e:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")
         except KafkaException as e:
