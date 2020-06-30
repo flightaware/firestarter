@@ -48,7 +48,10 @@ export default class ScheduledTable extends Component {
                             cellStyle: {
                                 fontFamily: 'Helvetica-Light',
                                 padding: '10px'
-                            }
+                            },
+                            rowStyle: rowData => ({
+                                backgroundColor: rowData.cancelled ? '#FF000055' : '#00000000'
+                            })
                         }}
                         columns={[
                             {title: "Ident", field: "ident", render: rowData => <Link to={`/flightinfo/${rowData.id}`}>{rowData.ident}</Link>},
@@ -76,7 +79,8 @@ export default class ScheduledTable extends Component {
                                 to: flight.destination, 
                                 depart: FS.getDepartureTime(flight).time, 
                                 gate: FS.getDepartureGate(flight),
-                                arrive: FS.getArrivalTime(flight).time
+                                arrive: FS.getArrivalTime(flight).time,
+                                cancelled: flight.cancelled
                             } 
                          ))}
                     />

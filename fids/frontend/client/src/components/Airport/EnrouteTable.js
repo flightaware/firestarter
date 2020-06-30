@@ -48,7 +48,10 @@ export default class EnrouteTable extends Component {
                             cellStyle: {
                                 fontFamily: 'Helvetica-Light',
                                 padding: '10px'
-                            }
+                            },
+                            rowStyle: rowData => ({
+                                backgroundColor: rowData.cancelled ? '#FF000055' : '#00000000'
+                            })
                         }}
                         columns={[
                             {title: "Ident", field: "ident", render: rowData => <Link to={`/flightinfo/${rowData.id}`}>{rowData.ident}</Link>},
@@ -76,7 +79,8 @@ export default class EnrouteTable extends Component {
                                 from: flight.origin,
                                 depart: FS.getDepartureTime(flight).time, 
                                 arrive: FS.getArrivalTime(flight).time,
-                                gate: FS.getArrivalGate(flight)
+                                gate: FS.getArrivalGate(flight),
+                                cancelled: flight.cancelled
                             } 
                          ))}
                     />

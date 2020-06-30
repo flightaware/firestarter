@@ -32,7 +32,7 @@ class AirportSearch extends Component {
         }
         // Set the state to what we're searching for
         this.setState({
-            [e.target.name]: e.target.value
+            [e.target.name]: e.target.value.toUpperCase()
         });
 
         if (this.state.airport !== "" || (this.state.origin !== "" && this.state.destination !== "")) {
