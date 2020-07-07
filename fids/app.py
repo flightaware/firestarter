@@ -52,12 +52,6 @@ def catch_all(path):
     return render_template("index.html")
 
 
-@app.route("/google_maps_api_key/")
-def google_maps_api_key() -> str:
-    """Get the GOOGLE_MAPS_API_KEY that was provided in the .env file"""
-    return os.getenv("GOOGLE_MAPS_API_KEY", "")
-
-
 @app.route("/positions/<flight_id>")
 def get_positions(flight_id: str) -> dict:
     """Get positions for a specific flight_id"""

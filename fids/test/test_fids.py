@@ -12,7 +12,6 @@ env = patch.dict(
     {
         "FLIGHTS_DB_URL": "sqlite:///test/db/flights.db",
         "POSITIONS_DB_URL": "sqlite:///test/db/positions.db",
-        "GOOGLE_MAPS_API_KEY": "TEST_KEY",
     },
 )
 # with env, patch('flask.Flask') as mock_flask:
@@ -84,13 +83,6 @@ class TestQueries(unittest.TestCase):
             result = app.airport_scheduled("CYZX").get_json()
             # fmt: off
             self.assertEqual(result, [{'actual_arrival_gate': None, 'actual_arrival_terminal': None, 'actual_departure_gate': None, 'actual_departure_terminal': None, 'actual_in': None, 'actual_off': None, 'actual_on': None, 'actual_out': None, 'added': 'Tue, 19 May 2020 15:23:39 GMT', 'aircraft_type': 'C177', 'atc_ident': None, 'baggage_claim': None, 'cancelled': None, 'changed': 'Tue, 19 May 2020 15:23:39 GMT', 'destination': 'CYQI', 'estimated_arrival_gate': None, 'estimated_departure_gate': None, 'estimated_in': None, 'estimated_off': 'Fri, 15 May 2020 13:30:00 GMT', 'estimated_on': 'Fri, 15 May 2020 14:18:58 GMT', 'estimated_out': None, 'filed_altitude': 6000, 'filed_ground_speed': None, 'filed_off': 'Fri, 15 May 2020 13:15:00 GMT', 'filed_speed': 112, 'flight_number': 'CGEYQ', 'hexid': None, 'id': 'CGEYQ-1589545563-3-1-67', 'origin': 'CYZX', 'predicted_in': None, 'predicted_off': 'Fri, 15 May 2020 13:30:00 GMT', 'predicted_on': 'Fri, 15 May 2020 14:18:58 GMT', 'predicted_out': None, 'registration': 'CGEYQ', 'route': 'CYZX..YZX..MUXEL..OMTIV..CYQI', 'scheduled_arrival_terminal': None, 'scheduled_departure_terminal': None, 'scheduled_in': None, 'scheduled_out': None, 'status': 'F', 'true_cancel': None}])
-            # fmt: on
-
-    def test_google_maps_api_key(self):
-        with app.app.app_context() and env:
-            result = app.google_maps_api_key()
-            # fmt: off
-            self.assertEqual(result, 'TEST_KEY')
             # fmt: on
 
     def test_get_positions(self):

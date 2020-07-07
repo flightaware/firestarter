@@ -11,10 +11,8 @@ export default class FlightInfo extends Component {
         this.state = {
             data: {},
             positions: {},
-            api_key: "",
             loading_flight: true,
             loading_positions: true,
-            loading_api_key: true,
         }
     }
 
@@ -24,7 +22,6 @@ export default class FlightInfo extends Component {
 
         this.fetchFlightInfo(params.flight);
         this.fetchPositions(params.flight);
-        this.fetchApiKey();
 
         console.log(params.flight);
 
@@ -54,20 +51,9 @@ export default class FlightInfo extends Component {
         }
     }
 
-    fetchApiKey() {
-        axios.get(`/google_maps_api_key/`)
-            .then(response => {
-                console.log(response.data)
-                this.setState({
-                    loading_api_key: false,
-                    api_key: response.data
-                });
-            });
-    }
-
     render() {
         
-        const { data, positions, api_key, loading_flight, loading_positions, loading_api_key } = this.state;
+        const { data, positions, loading_flight, loading_positions } = this.state;
 
         
 
@@ -156,9 +142,8 @@ export default class FlightInfo extends Component {
                 let obj = positions[i];
                 latlon +=  "|" + obj.latitude + "," + obj.longitude;
             }
-            console.log(api_key);
-            console.log(latlon);
-            return <div className="d-flex align-items-center"><img src={`https://maps.googleapis.com/maps/api/staticmap?size=640x400&markers=anchor:center|icon:https://github.com/flightaware/firestarter/raw/master/fids/images/aircraft_${image_bearing}.png|${positions[0].latitude},${positions[0].longitude}&path=color:0x0000ff|weight:5${latlon}&key=${api_key}`}/></div>
+
+            return <div className="d-flex align-items-center"><img src={`https://maps.googleapis.com/maps/api/staticmap?size=640x400&markers=anchor:center|icon:https://github.com/flightaware/firestarter/raw/master/fids/images/aircraft_${image_bearing}.png|${positions[0].latitude},${positions[0].longitude}&path=color:0x0000ff|weight:5${latlon}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`}/></div>
         }
 
         return (
@@ -215,7 +200,7 @@ export default class FlightInfo extends Component {
                             </Col>
                         </Row>
                     </Container>
-                    {!loading_positions && !loading_api_key && api_key != "" ?
+                    {!loading_positions && process.env.REACT_APP_GOOGLE_MAPS_API_KEY != "" ?
                     <div className="d-flex justify-content-center">{getMapImage()}</div>
                     : <Container></Container>}
                     <Container>
