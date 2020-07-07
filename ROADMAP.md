@@ -9,8 +9,8 @@ Firestarter v2 will introduce a robust queueing component between the connector
 and its clients, allowing for efficient data fan-out.
 
 ### v3
-Firestarter v3 will support processing and storage of airborn position data from
-Firehose. It will likely also include a sample application for viewing such
+Firestarter v3 adds support for processing and storage of airborne position data
+from Firehose. It will likely also include a sample application for viewing such
 data.
 
 ### v4
