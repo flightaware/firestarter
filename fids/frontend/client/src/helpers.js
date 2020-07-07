@@ -13,16 +13,16 @@ export const getBearingDegrees = (d_lat1, d_lon1, d_lat2, d_lon2) => {
 	let r_lon2 = degreesToRadians(d_lon2);
 	let dLon = (r_lon2 - r_lon1);
 
-    let y = Math.sin(dLon) * Math.cos(r_lat2);
-    let x = Math.cos(r_lat1) * Math.sin(r_lat2) - Math.sin(r_lat1)
-            * Math.cos(r_lat2) * Math.cos(dLon);
+	let y = Math.sin(dLon) * Math.cos(r_lat2);
+	let x = Math.cos(r_lat1) * Math.sin(r_lat2) - Math.sin(r_lat1)
+			* Math.cos(r_lat2) * Math.cos(dLon);
 
-    let brng = Math.atan2(y, x);
+	let brng = Math.atan2(y, x);
 
-    brng = radiansToDegrees(brng);
-    brng = (brng + 360) % 360;
+	brng = radiansToDegrees(brng);
+	brng = (brng + 360) % 360;
 
-    return brng;
+	return brng;
 }
 
 export const getClosestDegreeAngle = (input_degrees) => {
