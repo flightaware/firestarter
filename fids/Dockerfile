@@ -1,5 +1,8 @@
 FROM python:3.8-slim-buster
 
+ARG GOOGLE_MAPS_API_KEY
+ENV REACT_APP_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY
+
 RUN apt-get update && \
 	apt-get install -y libpq-dev gcc npm make && \
 	npm install npm@latest -g

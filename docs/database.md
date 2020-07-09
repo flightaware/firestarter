@@ -6,10 +6,14 @@ https://docs.sqlalchemy.org/en/13/dialects/index.html). By default, db-updater
 uses a sqlite database located on a Docker named volume. This allows the
 database file (located at `/home/firestarter/db/flights.db`) to persist between
 container restarts and allows sharing the database file with the fids
-component. db-updater has also been tested against PostgreSQL.
+component. Db-updater uses TimescaleDB for positions. TimescaleDB is a
+time-series database, so it is very effecient in handling time-series data like
+positions. It is also an extention of PostgreSQL, which has been fully tested
+in db-updater.
 
-When starting db-updater, it checks the database it's connected to for a table
-named "flights". If no such table exists, it is created with the schema found
+When starting db-updater, it checks the database it's connected to ensure that
+the "flights" or "positions" table exists (depending on what it is intended to
+update). If no such table exists, it is created with the schema found
 [here](../db-updater/main.py).
 
 ## Customizing the database connection
