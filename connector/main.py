@@ -251,6 +251,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 )
         except BufferError as e:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")
+            time.sleep(1)
         except KafkaException as e:
             if not e.args[0].retriable():
                 raise
