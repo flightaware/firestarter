@@ -141,8 +141,6 @@ services:
   zookeeper:
     image: "bitnami/zookeeper:3.6.0"
     init: true
-    ports:
-      - "2181:2181"
     networks:
       - internal
     environment:
@@ -153,8 +151,6 @@ services:
   kafka:
     image: "bitnami/kafka:2.5.0"
     init: true
-    ports:
-      - "9092:9092"
     networks:
       - internal
     environment:
@@ -170,8 +166,6 @@ services:
   timescaledb:
     image: "timescale/timescaledb:1.7.1-pg12"
     init: true
-    ports:
-      - "5432:5432"
     networks:
       - internal
     environment:
