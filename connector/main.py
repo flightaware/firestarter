@@ -175,8 +175,8 @@ async def print_stats(period: int) -> None:
 
 
 async def read_firehose(time_mode: str) -> Optional[str]:
-    """Open a connection to Firehose and read from it forever,
-    passing all messages along to all connected clients.
+    """Open a connection to Firehose and read from it forever, passing all
+    messages along to our kafka queues.
 
     Any errors will result in the function returning a string pitr value that
     can be passed to the function on a future call to allow for a reconnection
