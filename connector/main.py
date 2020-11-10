@@ -256,7 +256,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             if not e.args[0].retriable():
                 raise
             print(
-                f"Encountered retriable kafka error (e.args[0].str()), "
+                f"Encountered retriable kafka error ({e.args[0].str()}), "
                 "waiting a moment and trying again"
             )
             time.sleep(1)
