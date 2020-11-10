@@ -192,7 +192,11 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=context)
+    try:
+        fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=context)
+    except (AttributeError, OSError) as error:
+        print("Initial connection failed:", error)
+        return None
     print(f"Opened connection to Firehose at {SERVERNAME}:1501")
 
     initiation_command = build_init_cmd(time_mode)
