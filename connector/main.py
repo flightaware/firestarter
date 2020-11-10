@@ -114,8 +114,8 @@ def parse_script_args() -> None:
     for command in ["live", "pitr", "compression", "keepalive", "username", "password"]:
         if command in INIT_CMD_ARGS.split():
             raise ValueError(
-                f'$INIT_CMD_ARGS should not contain the "{command}" command. \
-                It belongs in its own variable.'
+                f'$INIT_CMD_ARGS should not contain the "{command}" command. '
+                "It belongs in its own variable."
             )
 
 
@@ -158,13 +158,13 @@ async def print_stats(period: int) -> None:
             total_bytes += bytes_read
             if period_seconds:
                 print(
-                    f"Period messages/s {lines_read / period_seconds:>5.0f}, \
-                    period bytes/s {bytes_read / period_seconds:>5.0f}"
+                    f"Period messages/s {lines_read / period_seconds:>5.0f}, "
+                    f"period bytes/s {bytes_read / period_seconds:>5.0f}"
                 )
             if total_seconds:
                 print(
-                    f"Total  messages/s {total_lines / total_seconds:>5.0f}, \
-                    total  bytes/s {total_bytes / total_seconds:>5.0f}"
+                    f"Total  messages/s {total_lines / total_seconds:>5.0f}, "
+                    f"total  bytes/s {total_bytes / total_seconds:>5.0f}"
                 )
             if catchup_rate:
                 print(f"Total catchup rate: {catchup_rate:.2f}x")
@@ -298,8 +298,8 @@ async def main():
             errors += 1
         else:
             print(
-                f"Connection failed {CONNECTION_ERROR_LIMIT} \
-                times before getting a non-error message, quitting"
+                f"Connection failed {CONNECTION_ERROR_LIMIT} "
+                "times before getting a non-error message, quitting"
             )
             break
 

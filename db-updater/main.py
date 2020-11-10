@@ -471,8 +471,8 @@ def main():
         setup_sqlite()
     if engine.has_table(TABLE):
         print(
-            f"{os.getenv('TABLE')} table already exists, \
-            clearing expired {os.getenv('TABLE')} before continuing"
+            f"{os.getenv('TABLE')} table already exists, "
+            "clearing expired {os.getenv('TABLE')} before continuing"
         )
         _expire_old_from_table()
         exists = True
