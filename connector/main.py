@@ -78,8 +78,7 @@ async def open_connection(
 
 
 def build_init_cmd(time_mode: str) -> str:
-    """Builds the init command based on the environment variables provided in docker-compose
-    """
+    """Builds the init command based on the environment variables provided in docker-compose"""
     initiation_command = f"{time_mode} username {USERNAME} password {APIKEY}"
     if COMPRESSION != "":
         initiation_command += f" compression {COMPRESSION}"
@@ -93,8 +92,7 @@ def build_init_cmd(time_mode: str) -> str:
 
 
 def parse_script_args() -> None:
-    """Sets global variables based on the environment variables provided in docker-compose
-    """
+    """Sets global variables based on the environment variables provided in docker-compose"""
     # pylint: disable=global-statement
     # pylint: disable=line-too-long
     global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, INIT_CMD_TIME, INIT_CMD_ARGS
@@ -237,7 +235,10 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         key = message.get("id", "").encode() or None
         try:
             if message["type"] == "keepalive":
-                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME"), os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+                topics = [
+                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
+                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
+                ]
             elif message["type"] == "position":
                 topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME")]
             else:
@@ -268,8 +269,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
 
 async def main():
-    """Connect to Firehose and write the output to kafka
-    """
+    """Connect to Firehose and write the output to kafka"""
     # pylint: disable=global-statement
     global producer, stats_lock, finished, last_good_pitr
 
