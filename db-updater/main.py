@@ -193,19 +193,12 @@ class Cache(ABC):
     """Cache definition"""
 
     @abstractmethod
-    def __init__(self, _table):
-        """Initialize cache"""
-        ...
-
-    @abstractmethod
     def add(self, data: dict) -> None:
         """Insert new row into the cache"""
-        ...
 
     @abstractmethod
     def flush(self, conn) -> None:
         """Flush cache to the database"""
-        ...
 
 
 class PositionCache(Cache):
@@ -214,7 +207,6 @@ class PositionCache(Cache):
     # pylint: disable=redefined-outer-name
     def __init__(self, table):
         """Initialize cache as a list"""
-        super().__init__(self)
         self.cache = []
         self.table = table
 
@@ -240,7 +232,6 @@ class FlightCache(Cache):
     # pylint: disable=redefined-outer-name
     def __init__(self, table):
         """Initialize cache as a dict"""
-        super().__init__(self)
         self.cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
         self.table = table
 
