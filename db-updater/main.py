@@ -28,9 +28,7 @@ meta = sa.MetaData()
 TABLE = os.getenv("TABLE")
 
 if TABLE not in ["flights", "positions"]:
-    raise ValueError(
-        f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'"
-    )
+    raise ValueError(f"Invalid TABLE env variable: {TABLE} - must be 'flights' or 'positions'")
 
 if TABLE == "flights":
     table = sa.Table(
@@ -470,10 +468,7 @@ def main():
     if engine.name == "sqlite":
         setup_sqlite()
     if engine.has_table(TABLE):
-        print(
-            f"{os.getenv('TABLE')} table already exists, "
-            "clearing expired {os.getenv('TABLE')} before continuing"
-        )
+        print(f"{TABLE} table already exists, clearing expired rows from {TABLE} before continuing")
         _expire_old_from_table()
         exists = True
     meta.create_all(engine)
