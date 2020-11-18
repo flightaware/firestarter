@@ -177,18 +177,11 @@ MSG_TABLE_KEYS = {c.key for c in MSG_TABLE_COLS}
 
 finished = threading.Event()
 cache_lock = threading.Lock()
-# Use a cache for accumulating flight information, flushing it to the database
-# as necessary.  It should contain full versions of flight rows (rather than
-# the sparse ones we might get if we just insert/update the table according to
-# received data) to ensure proper behavior of executemany-style SQLAlchemy
-# statements.
-# https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
-
 SQLITE_VAR_LIMIT = None
 
 
 class Cache(ABC):
-    """Cache definition"""
+    """A cache for accumulating flight or position information which can be flushed as necessary."""
 
     @abstractmethod
     def add(self, data: dict) -> None:
