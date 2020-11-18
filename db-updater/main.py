@@ -144,16 +144,14 @@ elif TABLE == "positions":
 engine_args: dict = {}
 db_url: str = os.getenv("DB_URL")  # type: ignore
 
-attempt_hypertable = 0
+# Make a hypertable on TimescaleDB for positions
+attempt_hypertable = TABLE == "positions"
 if "postgresql" in db_url:
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
     # performance even more.
     # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#psycopg2-fast-execution-helpers
     engine_args["executemany_mode"] = "values"
-
-    # Make a hypertable on TimescaleDB
-    attempt_hypertable = 1
 elif "sqlite" in db_url:
     # isolation_level setting works around buggy Python sqlite driver behavior
     # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl
