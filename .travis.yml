@@ -19,11 +19,16 @@ jobs:
       env:
         - INIT_CMD_TIME="pitr 1584126630"
         - INIT_CMD_ARGS="events \"flightplan departure arrival cancellation\""
+        - KAFKA_FLIFO_TOPIC_NAME=feed1
+        - KAFKA_POSITION_TOPIC_NAME=position_feed1
       install:
         - cd connector
         - make pip-sync-travis
 
     - stage: Db-updater
+      env:
+        - KAFKA_TOPIC_NAME=feed1
+        - KAFKA_GROUP_NAME=group1
       install:
         - cd db-updater
         - make pip-sync-travis

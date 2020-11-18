@@ -9,7 +9,7 @@ import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 
 # pylint: disable=invalid-name
-flights_engine = sa.create_engine(os.getenv("FLIGHTS_DB_URL"), echo=True)
+flights_engine = sa.create_engine(os.environ["FLIGHTS_DB_URL"], echo=True)
 flights_meta = sa.MetaData()
 flights_insp = sa.inspect(flights_engine)
 while "flights" not in flights_insp.get_table_names():
@@ -18,7 +18,7 @@ while "flights" not in flights_insp.get_table_names():
     time.sleep(3)
 flights = sa.Table("flights", flights_meta, autoload_with=flights_engine)
 
-positions_engine = sa.create_engine(os.getenv("POSITIONS_DB_URL"), echo=True)
+positions_engine = sa.create_engine(os.environ["POSITIONS_DB_URL"], echo=True)
 
 while True:
     try:

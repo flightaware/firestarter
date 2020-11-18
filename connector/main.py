@@ -14,8 +14,8 @@ from confluent_kafka import KafkaException, Producer  # type: ignore
 CONNECTION_ERROR_LIMIT = 3
 
 COMPRESSION: str
-USERNAME: Optional[str]
-APIKEY: Optional[str]
+USERNAME: str
+APIKEY: str
 KEEPALIVE: int
 INIT_CMD_ARGS: str
 INIT_CMD_TIME: str
@@ -98,17 +98,17 @@ def parse_script_args() -> None:
     global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, INIT_CMD_TIME, INIT_CMD_ARGS
 
     # **** REQUIRED ****
-    USERNAME = os.getenv("FH_USERNAME")
-    APIKEY = os.getenv("FH_APIKEY")
+    USERNAME = os.environ["FH_USERNAME"]
+    APIKEY = os.environ["FH_APIKEY"]
     # **** NOT REQUIRED ****
-    SERVERNAME = os.getenv("SERVER")  # type: ignore
-    COMPRESSION = os.getenv("COMPRESSION")  # type: ignore
-    STATS_PERIOD = int(os.getenv("PRINT_STATS_PERIOD"))  # type: ignore
-    KEEPALIVE = int(os.getenv("KEEPALIVE"))  # type: ignore
-    INIT_CMD_TIME = os.getenv("INIT_CMD_TIME")  # type: ignore
+    SERVERNAME = os.environ["SERVER"]
+    COMPRESSION = os.environ["COMPRESSION"]
+    STATS_PERIOD = int(os.environ["PRINT_STATS_PERIOD"])
+    KEEPALIVE = int(os.environ["KEEPALIVE"])
+    INIT_CMD_TIME = os.environ["INIT_CMD_TIME"]
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
-    INIT_CMD_ARGS = os.getenv("INIT_CMD_ARGS")  # type: ignore
+    INIT_CMD_ARGS = os.environ["INIT_CMD_ARGS"]
     for command in ["live", "pitr", "compression", "keepalive", "username", "password"]:
         if command in INIT_CMD_ARGS.split():
             raise ValueError(
@@ -236,13 +236,13 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         try:
             if message["type"] == "keepalive":
                 topics = [
-                    os.getenv("KAFKA_POSITION_TOPIC_NAME"),
-                    os.getenv("KAFKA_FLIFO_TOPIC_NAME"),
+                    os.environ["KAFKA_POSITION_TOPIC_NAME"],
+                    os.environ["KAFKA_FLIFO_TOPIC_NAME"],
                 ]
             elif message["type"] == "position":
-                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME")]
+                topics = [os.environ["KAFKA_POSITION_TOPIC_NAME"]]
             else:
-                topics = [os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+                topics = [os.environ["KAFKA_FLIFO_TOPIC_NAME"]]
             for topic in topics:
                 producer.produce(
                     topic,

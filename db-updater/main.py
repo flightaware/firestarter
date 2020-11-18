@@ -25,7 +25,7 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
-TABLE = os.getenv("TABLE")
+TABLE: str = os.environ["TABLE"]
 
 if TABLE not in ["flights", "positions"]:
     raise ValueError(f"Invalid TABLE env variable: {TABLE} - must be 'flights' or 'positions'")
@@ -142,7 +142,7 @@ elif TABLE == "positions":
     )
 
 engine_args: dict = {}
-db_url: str = os.getenv("DB_URL")  # type: ignore
+db_url: str = os.environ["DB_URL"]
 
 # Make a hypertable on TimescaleDB for positions
 attempt_hypertable = TABLE == "positions"
@@ -483,7 +483,7 @@ def main():
                 consumer = Consumer(
                     {
                         "bootstrap.servers": "kafka:9092",
-                        "group.id": os.getenv("KAFKA_GROUP_NAME"),
+                        "group.id": os.environ["KAFKA_GROUP_NAME"],
                         "auto.offset.reset": "earliest",
                         # Consider committing manually upon writes to db
                         # true by default anyway
@@ -491,7 +491,7 @@ def main():
                         "auto.commit.interval.ms": 1000,
                     }
                 )
-            consumer.subscribe([os.getenv("KAFKA_TOPIC_NAME")])
+            consumer.subscribe([os.environ["KAFKA_TOPIC_NAME"]])
             break
         except (KafkaException, OSError) as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
