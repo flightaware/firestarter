@@ -139,7 +139,7 @@ services:
         max-file: "5"
 
   zookeeper:
-    image: "bitnami/zookeeper:3.6.0"
+    image: "bitnami/zookeeper:3.6.2"
     init: true
     networks:
       - internal
@@ -164,7 +164,7 @@ services:
       - zookeeper
 
   timescaledb:
-    image: "timescale/timescaledb:1.7.1-pg12"
+    image: "timescale/timescaledb:1.7.4-pg12"
     init: true
     networks:
       - internal
