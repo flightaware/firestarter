@@ -119,7 +119,7 @@ elif TABLE == "positions":
         sa.Column("nav_altitude", sa.Integer),
         sa.Column("nav_heading", sa.String),
         sa.Column("nav_modes", sa.String),
-        sa.Column("nav_altimiter_setting", sa.String, key="nav_qnh"),
+        sa.Column("nav_altimeter_setting", sa.String, key="nav_qnh"),
         sa.Column("nic", sa.Integer),
         sa.Column("nic_baro", sa.Integer),
         sa.Column("radius_of_containment", sa.Integer, key="pos_rc"),
