@@ -41,9 +41,6 @@ services:
       # compression commands here. Documentation at
       # https://flightaware.com/commercial/firehose/documentation/commands
       - INIT_CMD_ARGS=${INIT_CMD_ARGS:-}
-      # Whether connector should immediately connect to Firehose upon starting
-      # (1) or wait until its first client has connected before it connects to
-      # Firehose (0).
       - PYTHONUNBUFFERED=1
       # Each producer should have its own unique FLIFO kafka topic name
       - KAFKA_FLIFO_TOPIC_NAME=feed1
