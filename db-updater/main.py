@@ -213,7 +213,13 @@ class PositionCache(Cache):
             return
 
         print(f"Flushing {len(self.cache)} new positions to table")
-        conn.execute(self.table.insert(), *self.cache)
+        # pylint: disable=import-outside-toplevel
+        from sqlalchemy.dialects.postgresql import insert  # type: ignore
+
+        # Ignore conflicts, indicative of running on an old pitr against a
+        # more recently updated table. Rows will just be stale until we catch
+        # up.
+        conn.execute(insert(self.table).on_conflict_do_nothing(), *self.cache)
         self.cache.clear()
 
 
