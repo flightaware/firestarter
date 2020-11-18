@@ -52,7 +52,8 @@ if TABLE == "flights":
         sa.Column("aircraft_type", sa.String, key="aircrafttype"),
         sa.Column("filed_ground_speed", sa.Integer, key="gs"),
         sa.Column("filed_speed", sa.Integer, key="speed"),
-        sa.Column("filed_altitude", sa.Integer, key="alt"),
+        sa.Column("filed_altitude", sa.Integer),
+        sa.Column("cruising_altitude", sa.Integer),
         sa.Column("true_cancel", sa.Boolean, key="trueCancel"),
         # These come through as a very lengthy list, worth stringifying?
         # sa.Column("waypoints", sa.String),
@@ -66,9 +67,10 @@ if TABLE == "flights":
         sa.Column("scheduled_arrival_terminal", sa.String),
         sa.Column("actual_departure_terminal", sa.String),
         sa.Column("scheduled_departure_terminal", sa.String),
+        sa.Column("actual_runway_off", sa.String),
+        sa.Column("actual_runway_on", sa.String),
         sa.Column("baggage_claim", sa.String),
         sa.Column("cancelled", TIMESTAMP_TZ()),
-        sa.Column("filed_off", TIMESTAMP_TZ(), key="fdt"),
         sa.Column("actual_out", TIMESTAMP_TZ()),
         sa.Column("actual_off", TIMESTAMP_TZ(), key="adt"),
         sa.Column("actual_on", TIMESTAMP_TZ(), key="aat"),
@@ -77,6 +79,7 @@ if TABLE == "flights":
         sa.Column("estimated_off", TIMESTAMP_TZ(), key="edt"),
         sa.Column("estimated_on", TIMESTAMP_TZ(), key="eta"),
         sa.Column("estimated_in", TIMESTAMP_TZ()),
+        sa.Column("scheduled_off", TIMESTAMP_TZ(), key="fdt"),
         sa.Column("scheduled_out", TIMESTAMP_TZ()),
         sa.Column("scheduled_in", TIMESTAMP_TZ()),
         sa.Column("predicted_out", TIMESTAMP_TZ()),
@@ -107,7 +110,8 @@ elif TABLE == "positions":
         sa.Column("destination", sa.String, key="dest"),
         sa.Column("estimated_departure_time", sa.Integer, key="edt"),
         sa.Column("estimated_arrival_time", sa.Integer, key="eta"),
-        sa.Column("enroute_time", sa.Integer, key="ete"),
+        sa.Column("en_route_time", sa.Integer, key="ete"),
+        sa.Column("filed_en_route_time", sa.Integer, key="filed_ete"),
         sa.Column("groundspeed", sa.Integer, key="gs"),
         sa.Column("heading", sa.String),
         sa.Column("magnetic_heading", sa.String, key="heading_magnetic"),
@@ -404,6 +408,7 @@ def process_arrival_message(data: dict) -> None:
 def process_cancellation_message(data: dict) -> None:
     """Cancel message type"""
     data["cancelled"] = data["pitr"]
+    disambiguate_altitude(data)
     return add_to_cache(data)
 
 
@@ -424,6 +429,28 @@ def process_onblock_message(data: dict) -> None:
     return add_to_cache(data)
 
 
+def process_flifo_message(data: dict) -> None:
+    """flifo message type"""
+    # flifo messages try to help us with saner names, but we already convert
+    # field names at the sqlalchemy level, so we actually need to convert the
+    # nice names to ugly names so they can be converted again later...
+    field_map = {
+        "actual_off": "adt",
+        "actual_on": "aat",
+        "estimated_off": "edt",
+        "estimated_on": "eta",
+        "filed_airspeed": "speed",
+        "status": "flightstatus",
+        "scheduled_off": "fdt",
+        "filed_alt": "filed_altitude",
+        "cruising_alt": "cruising_altitude",
+    }
+    for k, v in field_map.items():
+        if k in data:
+            data[v] = data.pop(k)
+    return add_to_cache(data)
+
+
 def process_extended_flight_info_message(data: dict) -> None:
     """extendedFlightInfo message type"""
     return add_to_cache(data)
@@ -431,6 +458,7 @@ def process_extended_flight_info_message(data: dict) -> None:
 
 def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
+    disambiguate_altitude(data)
     return add_to_cache(data)
 
 
@@ -443,6 +471,16 @@ def process_keepalive_message(data: dict) -> None:
     """Keepalive message type"""
     behind = datetime.now(tz=UTC) - datetime.fromtimestamp(int(data["pitr"]), tz=UTC)
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
+
+
+def disambiguate_altitude(data: dict):
+    """Replaces the alt field in the passed dict with an unambiguous field name"""
+
+    if "alt" in data:
+        if data.get("flightstatus") in ["F", "S"]:
+            data["filed_altitude"] = data.pop("alt")
+        else:
+            data["cruising_altitude"] = data.pop("alt")
 
 
 def setup_sqlite() -> None:
@@ -484,6 +522,7 @@ def main():
         "cancellation": process_cancellation_message,
         "offblock": process_offblock_message,
         "onblock": process_onblock_message,
+        "flifo": process_flifo_message,
         "extendedFlightInfo": process_extended_flight_info_message,
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
