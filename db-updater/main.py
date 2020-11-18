@@ -9,7 +9,7 @@ import threading
 import time
 import traceback
 import warnings
-from typing import Optional, Generator, KeysView
+from typing import Optional, Iterator, Iterable
 from abc import ABC, abstractmethod
 
 from confluent_kafka import KafkaException, Consumer  # type: ignore
@@ -323,7 +323,7 @@ def do_begin(conn: sa.engine.Transaction) -> None:
     conn.execute("BEGIN IMMEDIATE")
 
 
-def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
+def chunk(values: Iterable, chunk_size: Optional[int]) -> Iterator:
     """Splits a sequence into separate sequences of equal size (besides the last)
 
     values is the sequence that you want to split
