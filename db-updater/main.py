@@ -144,8 +144,6 @@ elif TABLE == "positions":
 engine_args: dict = {}
 db_url: str = os.environ["DB_URL"]
 
-# Make a hypertable on TimescaleDB for positions
-attempt_hypertable = TABLE == "positions"
 if "postgresql" in db_url:
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
@@ -160,6 +158,11 @@ elif "sqlite" in db_url:
     engine_args["connect_args"] = {"timeout": 60, "isolation_level": None}
 
 engine = sa.create_engine(db_url, **engine_args)
+if TABLE == "positions" and engine.name not in ["sqlite", "postgresql"]:
+    raise Exception("Positions are only supported by SQLite and PostgreSQL-based databases")
+
+# Make a hypertable on TimescaleDB for positions
+attempt_hypertable = engine.name == "postgresql" and TABLE == "positions"
 
 # Make sure that we can connect to the DB
 while True:
@@ -213,13 +216,20 @@ class PositionCache(Cache):
             return
 
         print(f"Flushing {len(self.cache)} new positions to table")
-        # pylint: disable=import-outside-toplevel
-        from sqlalchemy.dialects.postgresql import insert  # type: ignore
+        assert engine.name in ["sqlite", "postgresql"], f"{engine.name} is unsupported"
+        if engine.name == "postgresql":
+            # pylint: disable=import-outside-toplevel
+            from sqlalchemy.dialects.postgresql import insert  # type: ignore
+
+            statement = insert(self.table).on_conflict_do_nothing()
+        elif engine.name == "sqlite":
+            # Can replace with on_conflict_do_nothing() in SQLAlchemy 1.4b2
+            statement = self.table.insert().prefix_with("OR IGNORE")
 
         # Ignore conflicts, indicative of running on an old pitr against a
         # more recently updated table. Rows will just be stale until we catch
         # up.
-        conn.execute(insert(self.table).on_conflict_do_nothing(), *self.cache)
+        conn.execute(statement, *self.cache)
         self.cache.clear()
 
 
