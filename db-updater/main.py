@@ -9,7 +9,7 @@ import threading
 import time
 import traceback
 import warnings
-from typing import Optional, Generator, KeysView
+from typing import Optional, Iterator, Iterable
 from abc import ABC, abstractmethod
 
 from confluent_kafka import KafkaException, Consumer  # type: ignore
@@ -25,12 +25,10 @@ UTC = timezone.utc
 TIMESTAMP_TZ = lambda: sa.TIMESTAMP(timezone=True)
 # pylint: disable=invalid-name
 meta = sa.MetaData()
-TABLE = os.getenv("TABLE")
+TABLE: str = os.environ["TABLE"]
 
 if TABLE not in ["flights", "positions"]:
-    raise ValueError(
-        f"Invalid TABLE env variable: {os.getenv('TABLE')} - must be 'flights' or 'positions'"
-    )
+    raise ValueError(f"Invalid TABLE env variable: {TABLE} - must be 'flights' or 'positions'")
 
 if TABLE == "flights":
     table = sa.Table(
@@ -144,18 +142,14 @@ elif TABLE == "positions":
     )
 
 engine_args: dict = {}
-db_url: str = os.getenv("DB_URL")  # type: ignore
+db_url: str = os.environ["DB_URL"]
 
-attempt_hypertable = 0
 if "postgresql" in db_url:
     # Improve psycopg2 insert performance by using "fast execution helpers".
     # Further tuning of the executemany_*_page_size parameters could improve
     # performance even more.
     # https://docs.sqlalchemy.org/en/13/dialects/postgresql.html#psycopg2-fast-execution-helpers
     engine_args["executemany_mode"] = "values"
-
-    # Make a hypertable on TimescaleDB
-    attempt_hypertable = 1
 elif "sqlite" in db_url:
     # isolation_level setting works around buggy Python sqlite driver behavior
     # https://docs.sqlalchemy.org/en/13/dialects/sqlite.html#serializable-isolation-savepoints-transactional-ddl
@@ -164,6 +158,11 @@ elif "sqlite" in db_url:
     engine_args["connect_args"] = {"timeout": 60, "isolation_level": None}
 
 engine = sa.create_engine(db_url, **engine_args)
+if TABLE == "positions" and engine.name not in ["sqlite", "postgresql"]:
+    raise Exception("Positions are only supported by SQLite and PostgreSQL-based databases")
+
+# Make a hypertable on TimescaleDB for positions
+attempt_hypertable = engine.name == "postgresql" and TABLE == "positions"
 
 # Make sure that we can connect to the DB
 while True:
@@ -181,33 +180,19 @@ MSG_TABLE_KEYS = {c.key for c in MSG_TABLE_COLS}
 
 finished = threading.Event()
 cache_lock = threading.Lock()
-# Use a cache for accumulating flight information, flushing it to the database
-# as necessary.  It should contain full versions of flight rows (rather than
-# the sparse ones we might get if we just insert/update the table according to
-# received data) to ensure proper behavior of executemany-style SQLAlchemy
-# statements.
-# https://docs.sqlalchemy.org/en/13/core/tutorial.html#executing-multiple-statements
-
 SQLITE_VAR_LIMIT = None
 
 
 class Cache(ABC):
-    """Cache definition"""
-
-    @abstractmethod
-    def __init__(self, _table):
-        """Initialize cache"""
-        ...
+    """A cache for accumulating flight or position information which can be flushed as necessary."""
 
     @abstractmethod
     def add(self, data: dict) -> None:
         """Insert new row into the cache"""
-        ...
 
     @abstractmethod
     def flush(self, conn) -> None:
         """Flush cache to the database"""
-        ...
 
 
 class PositionCache(Cache):
@@ -216,7 +201,6 @@ class PositionCache(Cache):
     # pylint: disable=redefined-outer-name
     def __init__(self, table):
         """Initialize cache as a list"""
-        super().__init__(self)
         self.cache = []
         self.table = table
 
@@ -232,7 +216,20 @@ class PositionCache(Cache):
             return
 
         print(f"Flushing {len(self.cache)} new positions to table")
-        conn.execute(self.table.insert(), *self.cache)
+        assert engine.name in ["sqlite", "postgresql"], f"{engine.name} is unsupported"
+        if engine.name == "postgresql":
+            # pylint: disable=import-outside-toplevel
+            from sqlalchemy.dialects.postgresql import insert  # type: ignore
+
+            statement = insert(self.table).on_conflict_do_nothing()
+        elif engine.name == "sqlite":
+            # Can replace with on_conflict_do_nothing() in SQLAlchemy 1.4b2
+            statement = self.table.insert().prefix_with("OR IGNORE")
+
+        # Ignore conflicts, indicative of running on an old pitr against a
+        # more recently updated table. Rows will just be stale until we catch
+        # up.
+        conn.execute(statement, *self.cache)
         self.cache.clear()
 
 
@@ -242,7 +239,6 @@ class FlightCache(Cache):
     # pylint: disable=redefined-outer-name
     def __init__(self, table):
         """Initialize cache as a dict"""
-        super().__init__(self)
         self.cache = defaultdict(lambda: dict.fromkeys(MSG_TABLE_KEYS))  # type: dict
         self.table = table
 
@@ -343,7 +339,7 @@ def do_begin(conn: sa.engine.Transaction) -> None:
     conn.execute("BEGIN IMMEDIATE")
 
 
-def chunk(values: KeysView, chunk_size: Optional[int]) -> Generator:
+def chunk(values: Iterable, chunk_size: Optional[int]) -> Iterator:
     """Splits a sequence into separate sequences of equal size (besides the last)
 
     values is the sequence that you want to split
@@ -470,10 +466,7 @@ def main():
     if engine.name == "sqlite":
         setup_sqlite()
     if engine.has_table(TABLE):
-        print(
-            f"{os.getenv('TABLE')} table already exists, \
-            clearing expired {os.getenv('TABLE')} before continuing"
-        )
+        print(f"{TABLE} table already exists, clearing expired rows from {TABLE} before continuing")
         _expire_old_from_table()
         exists = True
     meta.create_all(engine)
@@ -506,7 +499,7 @@ def main():
                 consumer = Consumer(
                     {
                         "bootstrap.servers": "kafka:9092",
-                        "group.id": os.getenv("KAFKA_GROUP_NAME"),
+                        "group.id": os.environ["KAFKA_GROUP_NAME"],
                         "auto.offset.reset": "earliest",
                         # Consider committing manually upon writes to db
                         # true by default anyway
@@ -514,7 +507,7 @@ def main():
                         "auto.commit.interval.ms": 1000,
                     }
                 )
-            consumer.subscribe([os.getenv("KAFKA_TOPIC_NAME")])
+            consumer.subscribe([os.environ["KAFKA_TOPIC_NAME"]])
             break
         except (KafkaException, OSError) as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")

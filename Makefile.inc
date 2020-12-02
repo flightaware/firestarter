@@ -16,7 +16,6 @@ pip-sync: venv pip-compile
 
 pip-sync-travis:
 	$(PYTHON) -m pip install pip-tools
-	make -C requirements all
 	pip-sync $(wildcard requirements/*.txt)
 
 docker-setup: venv pip-sync

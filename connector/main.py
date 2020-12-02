@@ -14,8 +14,8 @@ from confluent_kafka import KafkaException, Producer  # type: ignore
 CONNECTION_ERROR_LIMIT = 3
 
 COMPRESSION: str
-USERNAME: Optional[str]
-APIKEY: Optional[str]
+USERNAME: str
+APIKEY: str
 KEEPALIVE: int
 INIT_CMD_ARGS: str
 INIT_CMD_TIME: str
@@ -78,8 +78,7 @@ async def open_connection(
 
 
 def build_init_cmd(time_mode: str) -> str:
-    """Builds the init command based on the environment variables provided in docker-compose
-    """
+    """Builds the init command based on the environment variables provided in docker-compose"""
     initiation_command = f"{time_mode} username {USERNAME} password {APIKEY}"
     if COMPRESSION != "":
         initiation_command += f" compression {COMPRESSION}"
@@ -93,29 +92,28 @@ def build_init_cmd(time_mode: str) -> str:
 
 
 def parse_script_args() -> None:
-    """Sets global variables based on the environment variables provided in docker-compose
-    """
+    """Sets global variables based on the environment variables provided in docker-compose"""
     # pylint: disable=global-statement
     # pylint: disable=line-too-long
     global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, INIT_CMD_TIME, INIT_CMD_ARGS
 
     # **** REQUIRED ****
-    USERNAME = os.getenv("FH_USERNAME")
-    APIKEY = os.getenv("FH_APIKEY")
+    USERNAME = os.environ["FH_USERNAME"]
+    APIKEY = os.environ["FH_APIKEY"]
     # **** NOT REQUIRED ****
-    SERVERNAME = os.getenv("SERVER")  # type: ignore
-    COMPRESSION = os.getenv("COMPRESSION")  # type: ignore
-    STATS_PERIOD = int(os.getenv("PRINT_STATS_PERIOD"))  # type: ignore
-    KEEPALIVE = int(os.getenv("KEEPALIVE"))  # type: ignore
-    INIT_CMD_TIME = os.getenv("INIT_CMD_TIME")  # type: ignore
+    SERVERNAME = os.environ["SERVER"]
+    COMPRESSION = os.environ["COMPRESSION"]
+    STATS_PERIOD = int(os.environ["PRINT_STATS_PERIOD"])
+    KEEPALIVE = int(os.environ["KEEPALIVE"])
+    INIT_CMD_TIME = os.environ["INIT_CMD_TIME"]
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
-    INIT_CMD_ARGS = os.getenv("INIT_CMD_ARGS")  # type: ignore
+    INIT_CMD_ARGS = os.environ["INIT_CMD_ARGS"]
     for command in ["live", "pitr", "compression", "keepalive", "username", "password"]:
         if command in INIT_CMD_ARGS.split():
             raise ValueError(
-                f'$INIT_CMD_ARGS should not contain the "{command}" command. \
-                It belongs in its own variable.'
+                f'$INIT_CMD_ARGS should not contain the "{command}" command. '
+                "It belongs in its own variable."
             )
 
 
@@ -158,13 +156,13 @@ async def print_stats(period: int) -> None:
             total_bytes += bytes_read
             if period_seconds:
                 print(
-                    f"Period messages/s {lines_read / period_seconds:>5.0f}, \
-                    period bytes/s {bytes_read / period_seconds:>5.0f}"
+                    f"Period messages/s {lines_read / period_seconds:>5.0f}, "
+                    f"period bytes/s {bytes_read / period_seconds:>5.0f}"
                 )
             if total_seconds:
                 print(
-                    f"Total  messages/s {total_lines / total_seconds:>5.0f}, \
-                    total  bytes/s {total_bytes / total_seconds:>5.0f}"
+                    f"Total  messages/s {total_lines / total_seconds:>5.0f}, "
+                    f"total  bytes/s {total_bytes / total_seconds:>5.0f}"
                 )
             if catchup_rate:
                 print(f"Total catchup rate: {catchup_rate:.2f}x")
@@ -175,8 +173,8 @@ async def print_stats(period: int) -> None:
 
 
 async def read_firehose(time_mode: str) -> Optional[str]:
-    """Open a connection to Firehose and read from it forever,
-    passing all messages along to all connected clients.
+    """Open a connection to Firehose and read from it forever, passing all
+    messages along to our kafka queues.
 
     Any errors will result in the function returning a string pitr value that
     can be passed to the function on a future call to allow for a reconnection
@@ -192,7 +190,11 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=context)
+    try:
+        fh_reader, fh_writer = await open_connection(host=SERVERNAME, port=1501, ssl=context)
+    except (AttributeError, OSError) as error:
+        print("Initial connection failed:", error)
+        return None
     print(f"Opened connection to Firehose at {SERVERNAME}:1501")
 
     initiation_command = build_init_cmd(time_mode)
@@ -233,11 +235,14 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         key = message.get("id", "").encode() or None
         try:
             if message["type"] == "keepalive":
-                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME"), os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+                topics = [
+                    os.environ["KAFKA_POSITION_TOPIC_NAME"],
+                    os.environ["KAFKA_FLIFO_TOPIC_NAME"],
+                ]
             elif message["type"] == "position":
-                topics = [os.getenv("KAFKA_POSITION_TOPIC_NAME")]
+                topics = [os.environ["KAFKA_POSITION_TOPIC_NAME"]]
             else:
-                topics = [os.getenv("KAFKA_FLIFO_TOPIC_NAME")]
+                topics = [os.environ["KAFKA_FLIFO_TOPIC_NAME"]]
             for topic in topics:
                 producer.produce(
                     topic,
@@ -247,11 +252,12 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 )
         except BufferError as e:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")
+            time.sleep(1)
         except KafkaException as e:
             if not e.args[0].retriable():
                 raise
             print(
-                f"Encountered retriable kafka error (e.args[0].str()), "
+                f"Encountered retriable kafka error ({e.args[0].str()}), "
                 "waiting a moment and trying again"
             )
             time.sleep(1)
@@ -263,8 +269,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
 
 async def main():
-    """Connect to Firehose and write the output to kafka
-    """
+    """Connect to Firehose and write the output to kafka"""
     # pylint: disable=global-statement
     global producer, stats_lock, finished, last_good_pitr
 
@@ -298,8 +303,8 @@ async def main():
             errors += 1
         else:
             print(
-                f"Connection failed {CONNECTION_ERROR_LIMIT} \
-                times before getting a non-error message, quitting"
+                f"Connection failed {CONNECTION_ERROR_LIMIT} "
+                "times before getting a non-error message, quitting"
             )
             break
 

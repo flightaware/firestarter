@@ -41,9 +41,6 @@ services:
       # compression commands here. Documentation at
       # https://flightaware.com/commercial/firehose/documentation/commands
       - INIT_CMD_ARGS=${INIT_CMD_ARGS:-}
-      # Whether connector should immediately connect to Firehose upon starting
-      # (1) or wait until its first client has connected before it connects to
-      # Firehose (0).
       - PYTHONUNBUFFERED=1
       # Each producer should have its own unique FLIFO kafka topic name
       - KAFKA_FLIFO_TOPIC_NAME=feed1
@@ -139,10 +136,8 @@ services:
         max-file: "5"
 
   zookeeper:
-    image: "bitnami/zookeeper:3.6.0"
+    image: "bitnami/zookeeper:3.6.2"
     init: true
-    ports:
-      - "2181:2181"
     networks:
       - internal
     environment:
@@ -153,8 +148,6 @@ services:
   kafka:
     image: "bitnami/kafka:2.5.0"
     init: true
-    ports:
-      - "9092:9092"
     networks:
       - internal
     environment:
@@ -168,10 +161,8 @@ services:
       - zookeeper
 
   timescaledb:
-    image: "timescale/timescaledb:1.7.1-pg12"
+    image: "timescale/timescaledb:1.7.4-pg12"
     init: true
-    ports:
-      - "5432:5432"
     networks:
       - internal
     environment:

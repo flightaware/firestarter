@@ -1,5 +1,5 @@
 run:
-	docker-compose up --build
+	docker-compose build --parallel && docker-compose up
 
 run-background:
-	docker-compose up -d --build
+	docker-compose build --parallel && docker-compose up -d
