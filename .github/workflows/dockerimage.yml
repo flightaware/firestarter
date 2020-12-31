@@ -38,8 +38,8 @@ jobs:
           KAFKA_POSITION_TOPIC_NAME: position_feed1
         run: |
           cd connector
-          make pip-sync-travis
-          make test-travis
+          make pip-sync-ci
+          make test-ci
 
       - name: Db-updater
         env:
@@ -47,14 +47,14 @@ jobs:
           KAFKA_GROUP_NAME: group1
         run: |
           cd db-updater
-          make pip-sync-travis
-          make test-travis
+          make pip-sync-ci
+          make test-ci
 
       - name: Fids
         run: |
           cd fids
-          make pip-sync-travis
-          make test-travis
+          make pip-sync-ci
+          make test-ci
 
       - name: Full_Integration
         env:
@@ -63,7 +63,7 @@ jobs:
           docker-compose up -d --build
           python3 -m pip install webdriver-manager
           python3 -m pip install selenium
-          python3 travis_ping_frontend.py
+          python3 ci_ping_frontend.py
 
       - name: Performance
         env:
@@ -71,5 +71,5 @@ jobs:
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
           docker-compose up -d --build
-          ./travis_performance_regression_test.sh
+          ./ci_performance_regression_test.sh
           
