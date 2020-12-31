@@ -34,7 +34,7 @@ check: lint type-check
 test: 
 	. venv/bin/activate && $(PYTHON) -m unittest discover -s test
 
-test-ciss: 
+test-ci: 
 	$(PYTHON) -m unittest discover -s test
 
 run:
