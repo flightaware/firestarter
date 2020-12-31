@@ -65,6 +65,7 @@ jobs:
           python3 -m pip install selenium
           python3 ci_ping_frontend.py
           docker-compose rm -fsv
+          docker volume prune -f
 
       - name: Performance
         env:
