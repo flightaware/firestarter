@@ -14,7 +14,7 @@ env:
   FH_APIKEY: ${{ secrets.FH_APIKEY }}
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
