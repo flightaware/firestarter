@@ -1,0 +1,77 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  KEEPALIVE: 60
+  SERVER: firehose-test.flightaware.com
+  PRINT_STATS_PERIOD: 0
+  FH_USERNAME: ${{ secrets.FH_USERNAME }}
+  FH_APIKEY: ${{ secrets.FH_APIKEY }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [12.16.3]
+        python-version: [3.7]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Connector
+        env:
+          INIT_CMD_TIME: "pitr 1584126630"
+          INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation\""
+          KAFKA_FLIFO_TOPIC_NAME: feed1
+          KAFKA_POSITION_TOPIC_NAME: position_feed1
+        run: |
+          cd connector
+          make pip-sync-ci
+          make test-ci
+
+      - name: Db-updater
+        env:
+          KAFKA_TOPIC_NAME: feed1
+          KAFKA_GROUP_NAME: group1
+        run: |
+          cd db-updater
+          make pip-sync-ci
+          make test-ci
+
+      - name: Fids
+        run: |
+          cd fids
+          make pip-sync-ci
+          make test-ci
+
+      - name: Full_Integration
+        env:
+          INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
+        run: |
+          docker-compose up -d --build
+          python3 -m pip install webdriver-manager
+          python3 -m pip install selenium
+          python3 ci_ping_frontend.py
+          docker-compose rm -fsv
+          docker volume prune -f
+
+      - name: Performance
+        env:
+          INIT_CMD_TIME: "pitr 1577880000"
+          INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
+        run: |
+          docker-compose up -d --build
+          ./ci_performance_regression_test.sh
+          

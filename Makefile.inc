@@ -14,7 +14,7 @@ pip-compile: venv
 pip-sync: venv pip-compile
 	. venv/bin/activate && venv/bin/pip-sync $(wildcard requirements/*.txt)
 
-pip-sync-travis:
+pip-sync-ci:
 	$(PYTHON) -m pip install pip-tools
 	pip-sync $(wildcard requirements/*.txt)
 
@@ -34,7 +34,7 @@ check: lint type-check
 test: 
 	. venv/bin/activate && $(PYTHON) -m unittest discover -s test
 
-test-travis: 
+test-ci: 
 	$(PYTHON) -m unittest discover -s test
 
 run:
