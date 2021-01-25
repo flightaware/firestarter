@@ -10,7 +10,7 @@ export default class AppNavbar extends Component {
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="ml-auto">
                         <Nav.Link href="/">Home</Nav.Link>
-                        <Nav.Link href="/flightinfo/">Random Flight</Nav.Link>
+                        <Nav.Link href="/flightinfo/random">Random Flight</Nav.Link>
                     </Nav>
                 </Navbar.Collapse>
             </Navbar>

@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
+import { Redirect } from 'react-router-dom';
 import axios from 'axios';
 import * as FS from '../../controller.js';
 import * as helpers from '../../helpers.js';
@@ -11,6 +12,7 @@ export default class FlightInfo extends Component {
         this.state = {
             data: {},
             positions: {},
+            flight_id: props.match.flight,
             loading_flight: true,
             loading_positions: true,
         }
@@ -19,27 +21,30 @@ export default class FlightInfo extends Component {
     componentDidMount() {
 
         const { match: { params } } = this.props;
-
         this.fetchFlightInfo(params.flight);
         this.fetchPositions(params.flight);
-
-        console.log(params.flight);
 
     }
 
     fetchFlightInfo(flightID) {
-        axios.get(`/flights/${!flightID ? '' : flightID}`)
+        axios.get(`/flights/${(flightID === 'random') ? '' : flightID}`)
             .then(response => {
                 console.log(response.data)
                 this.setState({
                     loading_flight: false,
-                    data: response.data
+                    data: response.data,
+                    flight_id: response.data.id
                 });
+                if (flightID === 'random') {
+                    // Original position fetch will have been skipped since we
+                    // didn't initially have a flight ID. Try again.
+                    this.fetchPositions(response.data.id);
+                }
             });
     }
 
     fetchPositions(flightID) {
-        if (flightID) {
+        if (flightID !== 'random') {
             axios.get(`/positions/${flightID}`)
                 .then(response => {
                     console.log(response)
@@ -148,6 +153,7 @@ export default class FlightInfo extends Component {
 
         return (
             <Container className="flight-info-wrapper">
+                {(data.id && this.props.match.flight !== data.id) ? <Redirect to={`/flightinfo/${data.id}`}/> : ""}
                 {
                 !loading_flight ?
                     <>
