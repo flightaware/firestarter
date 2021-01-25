@@ -219,7 +219,7 @@ class PositionCache(Cache):
         if not self.cache:
             return
 
-        print(f"Flushing {len(self.cache)} new positions to table")
+        print(f"Flushing {len(self.cache)} new positions to database")
         assert engine.name in ["sqlite", "postgresql"], f"{engine.name} is unsupported"
         if engine.name == "postgresql":
             # pylint: disable=import-outside-toplevel
