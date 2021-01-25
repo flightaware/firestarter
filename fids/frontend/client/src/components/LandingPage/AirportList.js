@@ -35,7 +35,7 @@ class AirportList extends Component {
             loading: true,
             since: val
         });
-        this.fetchTopAirports(this.state.since);
+        this.fetchTopAirports(val);
     }
 
     render() {
