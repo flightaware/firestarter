@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Live Flight Map</title>
+		<script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+		<script
+		  src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key  }}&callback=initMap&libraries=geometry&v=weekly"
+	defer
+	></script>
+		<style type="text/css">
+		/* Always set the map height explicitly to define the size of the div
+		 * element that contains the map. */
+		#map {
+			height: 100%;
+		}
+
+		/* Optional: Makes the sample page fill the window. */
+		html,
+		body {
+			height: 100%;
+			margin: 0;
+			padding: 0;
+		}
+		</style>
+		<script>
+		let map;
+		const active_flights = new Map();
+		const completed_flights = new Set();
+		const info_windows = new Set();
+
+		function initMap() {
+			map = new google.maps.Map(document.getElementById("map"), {
+				center: { lat: 0, lng: 0 },
+				zoom: 4,
+			});
+			const start_live = {{ startlive|tojson }};
+			const url = start_live ? "listen?live" : "listen"
+			const evtSource = new EventSource(url);
+			evtSource.onmessage = function(event) {
+				const msg = JSON.parse(event.data);
+				if (msg.type === "position" && !completed_flights.has(msg.id)) {
+					if (!active_flights.has(msg.id)) {
+						let rot = 0;
+						if (msg.heading !== undefined) {
+							rot = msg.heading % 360
+						}
+						const flight_info = {
+							info: msg,
+							marker: new google.maps.Marker({
+								position: {lat: parseFloat(msg.lat), lng: parseFloat(msg.lon)},
+								icon: `static/images/aircraft_${rot}.png`,
+								map: map,
+								title: msg.ident,
+								// Tanks performance in exchange for no flicker on
+								// icon update.
+								optimized: false,
+							})
+						};
+						active_flights.set(msg.id, flight_info);
+						active_flights.get(msg.id).marker.addListener("click", () => {
+							// FIXME: This is janky, not really sure how to
+							// inject the proper host:port (since port is
+							// dynamically determined)
+							window.open(`http://gogan.hou.flightaware.com:5031/flightinfo/${msg.id}`);
+						});
+						active_flights.get(msg.id).marker.addListener("mouseover", (event) => {
+							for (i of info_windows) {
+								i.close();
+							}
+							info_windows.clear();
+							const win = new google.maps.InfoWindow({
+								content: `
+								<table>
+									<tbody>
+										<tr><td>Ident: </td><td>${msg.ident || ''}</td></tr>
+										<tr><td>Reg: </td><td>${msg.reg || ''}</td></tr>
+										<tr><td>Aircraft: </td><td>${msg.aircrafttype || ''}</td></tr>
+										<tr><td>Alt: </td><td>${msg.alt || ''}</td></tr>
+										<tr><td>Speed: </td><td>${msg.gs || ''}</td></tr>
+										<tr><td style="text-align: center" colspan="2">${msg.orig || ''} → ${msg.dest || ''}</td></tr>
+									</tbody>
+								</table>
+								`
+							})
+							info_windows.add(win)
+							win.open(map, flight_info.marker);
+						});
+					} else {
+						flight = active_flights.get(msg.id)
+						const oldpos = flight.marker.getPosition();
+						const newpos = new google.maps.LatLng({lat: parseFloat(msg.lat), lng: parseFloat(msg.lon)});
+						const rot = Math.floor(google.maps.geometry.spherical.computeHeading(oldpos, newpos) + 360) % 360;
+						flight.marker.setIcon(`static/images/aircraft_${rot}.png`);
+						flight.marker.setPosition(newpos);
+					}
+				} else if (msg.type === "cancellation" || msg.actual_on || msg.actual_in || msg.aat) {
+					completed_flights.add(msg.id);
+					if (active_flights.has(msg.id)) {
+						const flight = active_flights.get(msg.id);
+						flight.marker.setMap(null);
+						active_flights.delete(msg.id);
+					}
+				}
+			}
+		}
+    </script>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+</html>
