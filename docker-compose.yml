@@ -42,10 +42,8 @@ services:
       # https://flightaware.com/commercial/firehose/documentation/commands
       - INIT_CMD_ARGS=${INIT_CMD_ARGS:-}
       - PYTHONUNBUFFERED=1
-      # Each producer should have its own unique FLIFO kafka topic name
-      - KAFKA_FLIFO_TOPIC_NAME=feed1
-      # Each producer should have its own unique POSITION kafka topic name
-      - KAFKA_POSITION_TOPIC_NAME=position_feed1
+      # Use a single topic for all events to ensure proper ordering per flight
+      - KAFKA_TOPIC_NAME=events
     logging:
       driver: "json-file"
       options:
@@ -66,7 +64,7 @@ services:
       - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
-      - KAFKA_TOPIC_NAME=feed1
+      - KAFKA_TOPIC_NAME=events
       # Consumers with the same group name will split the data between them,
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=group1
@@ -94,7 +92,7 @@ services:
       - DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
-      - KAFKA_TOPIC_NAME=position_feed1
+      - KAFKA_TOPIC_NAME=events
       # Consumers with the same group name will split the data between them,
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=position_group1

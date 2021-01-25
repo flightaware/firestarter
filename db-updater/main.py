@@ -87,6 +87,7 @@ if TABLE == "flights":
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
     )
+    VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo"}
 elif TABLE == "positions":
     table = sa.Table(
         "positions",
@@ -144,6 +145,7 @@ elif TABLE == "positions":
         sa.Column("wind_quality", sa.Integer),
         sa.Column("wind_speed", sa.Integer),
     )
+    VALID_EVENTS = {"position"}
 
 engine_args: dict = {}
 db_url: str = os.environ["DB_URL"]
@@ -565,6 +567,9 @@ def main():
             # They continue in the examples, so let's do it as well
             continue
         message = json.loads(messagestr.value())
+        event_type = message["type"]
+        if event_type != "keepalive" and event_type not in VALID_EVENTS:
+            continue
         processor_functions.get(message["type"], process_unknown_message)(message)
 
 

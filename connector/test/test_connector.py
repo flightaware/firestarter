@@ -35,8 +35,7 @@ class TestReconnect(unittest.TestCase):
                 "INIT_CMD_TIME": "live",
                 "SERVER": "testserver",
                 "PRINT_STATS_PERIOD": "0",
-                "KAFKA_FLIFO_TOPIC_NAME": "topic1",
-                "KAFKA_POSITION_TOPIC_NAME": "topic2",
+                "KAFKA_TOPIC_NAME": "topic1",
             },
         )
         self.mock_reader = Mock()
