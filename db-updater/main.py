@@ -319,16 +319,21 @@ def convert_msg_fields(msg: dict) -> dict:
     """Remove unneeded keys from message JSON and convert value types.
 
     Modifies msg in-place and returns it."""
+    pitr = msg["pitr"]
     for key in msg.keys() - MSG_TABLE_KEYS:
         del msg[key]
-    for key, val in msg.items():
+    for key, val in list(msg.items()):
         column_type = str(table.c[key].type)
-        if column_type == "TIMESTAMP":
-            msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
-        elif column_type == "INTEGER":
-            msg[key] = int(val)
-        elif column_type == "BOOLEAN":
-            msg[key] = bool(int(val))
+        try:
+            if column_type == "TIMESTAMP":
+                msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
+            elif column_type == "INTEGER":
+                msg[key] = int(float(val))
+            elif column_type == "BOOLEAN":
+                msg[key] = bool(int(val))
+        except Exception as e:
+            print(f"Couldn't convert '{key}' field in message for flight_id '{msg['id']}' at '{pitr}'")
+            raise
     return msg
 
 
