@@ -109,7 +109,7 @@ def get_busiest_airports() -> Response:
                 select([flights.c.origin])
                 .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) > since)
                 .group_by(flights.c.origin)
-                .order_by(func.count().desc())
+                .order_by(func.count().desc(), flights.c.origin)
                 .limit(limit)
             )
         ]
