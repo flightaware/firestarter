@@ -109,7 +109,7 @@ def get_busiest_airports() -> Response:
                 select([flights.c.origin])
                 .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) > since)
                 .group_by(flights.c.origin)
-                .order_by(func.count().desc())
+                .order_by(func.count().desc(), flights.c.origin)
                 .limit(limit)
             )
         ]
@@ -197,7 +197,7 @@ def airport_scheduled(airport: str) -> Response:
                     # You can actually get true_cancel'ed flights with an actual_out/off. Weird?
                     flights.c.true_cancel,
                 ),
-                flights.c.filed_off.between(past_dropoff, future_dropoff),
+                flights.c.scheduled_off.between(past_dropoff, future_dropoff),
                 or_(
                     flights.c.cancelled == None,
                     and_(flights.c.true_cancel, flights.c.cancelled > past_dropoff),
