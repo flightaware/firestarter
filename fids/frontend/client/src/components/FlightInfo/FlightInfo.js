@@ -226,9 +226,9 @@ export default class FlightInfo extends Component {
                                         Takeoff
                                     </div>
                                     {getTakeoffTime()}
-                                    {data.filed_off && 
+                                    {data.scheduled_off &&
                                     <div className="mb-1 scheduled-time">
-                                        Scheduled: {data.filed_off}
+                                        Scheduled: {data.scheduled_off}
                                     </div>}
                                 </Col>
                             </Row>
