@@ -148,7 +148,7 @@ export default class FlightInfo extends Component {
                 latlon +=  "|" + obj.latitude + "," + obj.longitude;
             }
 
-            return <div className="d-flex align-items-center"><img src={`https://maps.googleapis.com/maps/api/staticmap?size=640x400&markers=anchor:center|icon:https://github.com/flightaware/firestarter/raw/master/fids/images/aircraft_${image_bearing}.png|${positions[0].latitude},${positions[0].longitude}&path=color:0x0000ff|weight:5${latlon}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`}/></div>
+            return <div className="d-flex align-items-center"><img src={`https://maps.googleapis.com/maps/api/staticmap?size=640x400&markers=anchor:center|icon:https://github.com/flightaware/firestarter/raw/master/fids/images/aircraft_${image_bearing}.png|${positions[0].latitude},${positions[0].longitude}&path=color:0x0000ff|weight:5${latlon}&key=${window.GOOGLE_MAPS_API_KEY}`}/></div>
         }
 
         return (
@@ -206,7 +206,7 @@ export default class FlightInfo extends Component {
                             </Col>
                         </Row>
                     </Container>
-                    {!loading_positions && process.env.REACT_APP_GOOGLE_MAPS_API_KEY != "" ?
+                    {!loading_positions && window.GOOGLE_MAPS_API_KEY ?
                     <div className="d-flex justify-content-center">{getMapImage()}</div>
                     : <Container></Container>}
                     <Container>

@@ -111,8 +111,6 @@ services:
     build:
       context: .
       dockerfile: fids/Dockerfile
-      args:
-        - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
     init: true
     ports:
       # Port upon which to serve webapp
@@ -124,6 +122,7 @@ services:
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
       - FLIGHTS_DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - POSITIONS_DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - GOOGLE_MAPS_API_KEY
       - PYTHONUNBUFFERED=1
     volumes:
       - data:/home/firestarter/app/db
