@@ -33,6 +33,12 @@
 				center: { lat: 0, lng: 0 },
 				zoom: 4,
 			});
+			map.addListener("click", (e) => {
+				for (i of info_windows) {
+					i.close();
+				}
+				info_windows.clear();
+			});
 			const start_live = {{ startlive|tojson }};
 			const url = start_live ? "listen?live" : "listen"
 			const evtSource = new EventSource(url);
@@ -57,7 +63,7 @@
 							})
 						};
 						active_flights.set(msg.id, flight_info);
-						active_flights.get(msg.id).marker.addListener("mouseover", (event) => {
+						active_flights.get(msg.id).marker.addListener("click", (event) => {
 							for (i of info_windows) {
 								i.close();
 							}
