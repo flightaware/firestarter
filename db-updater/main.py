@@ -87,6 +87,7 @@ if TABLE == "flights":
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
     )
+    VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo"}
 elif TABLE == "positions":
     table = sa.Table(
         "positions",
@@ -144,6 +145,7 @@ elif TABLE == "positions":
         sa.Column("wind_quality", sa.Integer),
         sa.Column("wind_speed", sa.Integer),
     )
+    VALID_EVENTS = {"position"}
 
 engine_args: dict = {}
 db_url: str = os.environ["DB_URL"]
@@ -219,7 +221,7 @@ class PositionCache(Cache):
         if not self.cache:
             return
 
-        print(f"Flushing {len(self.cache)} new positions to table")
+        print(f"Flushing {len(self.cache)} new positions to database")
         assert engine.name in ["sqlite", "postgresql"], f"{engine.name} is unsupported"
         if engine.name == "postgresql":
             # pylint: disable=import-outside-toplevel
@@ -317,16 +319,21 @@ def convert_msg_fields(msg: dict) -> dict:
     """Remove unneeded keys from message JSON and convert value types.
 
     Modifies msg in-place and returns it."""
+    pitr = msg["pitr"]
     for key in msg.keys() - MSG_TABLE_KEYS:
         del msg[key]
-    for key, val in msg.items():
+    for key, val in list(msg.items()):
         column_type = str(table.c[key].type)
-        if column_type == "TIMESTAMP":
-            msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
-        elif column_type == "INTEGER":
-            msg[key] = int(val)
-        elif column_type == "BOOLEAN":
-            msg[key] = bool(int(val))
+        try:
+            if column_type == "TIMESTAMP":
+                msg[key] = datetime.fromtimestamp(int(val), tz=UTC)
+            elif column_type == "INTEGER":
+                msg[key] = int(float(val))
+            elif column_type == "BOOLEAN":
+                msg[key] = bool(int(val))
+        except Exception as e:
+            print(f"Couldn't convert '{key}' field in message for flight_id '{msg['id']}' at '{pitr}'")
+            raise
     return msg
 
 
@@ -565,6 +572,9 @@ def main():
             # They continue in the examples, so let's do it as well
             continue
         message = json.loads(messagestr.value())
+        event_type = message["type"]
+        if event_type != "keepalive" and event_type not in VALID_EVENTS:
+            continue
         processor_functions.get(message["type"], process_unknown_message)(message)
 
 

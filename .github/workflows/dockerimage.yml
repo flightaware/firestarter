@@ -34,8 +34,7 @@ jobs:
         env:
           INIT_CMD_TIME: "pitr 1584126630"
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation\""
-          KAFKA_FLIFO_TOPIC_NAME: feed1
-          KAFKA_POSITION_TOPIC_NAME: position_feed1
+          KAFKA_TOPIC_NAME: feed1
         run: |
           cd connector
           make pip-sync-ci

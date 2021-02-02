@@ -232,24 +232,16 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 # All we can really do is report it
                 print(f"Error when delivering message: {err}")
 
+        # FIXME: This makes keepalives a bit useless if they won't be showing
+        # up in order with any other messages
         key = message.get("id", "").encode() or None
         try:
-            if message["type"] == "keepalive":
-                topics = [
-                    os.environ["KAFKA_POSITION_TOPIC_NAME"],
-                    os.environ["KAFKA_FLIFO_TOPIC_NAME"],
-                ]
-            elif message["type"] == "position":
-                topics = [os.environ["KAFKA_POSITION_TOPIC_NAME"]]
-            else:
-                topics = [os.environ["KAFKA_FLIFO_TOPIC_NAME"]]
-            for topic in topics:
-                producer.produce(
-                    topic,
-                    key=key,
-                    value=line,
-                    callback=delivery_report,
-                )
+            producer.produce(
+                os.environ["KAFKA_TOPIC_NAME"],
+                key=key,
+                value=line,
+                callback=delivery_report,
+            )
         except BufferError as e:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")
             time.sleep(1)

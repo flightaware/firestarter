@@ -49,7 +49,9 @@ UTC = timezone.utc
 def catch_all(path):
     """Render HTML"""
     # pylint: disable=unused-argument
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY", ""))
 
 
 @app.route("/positions/<flight_id>")

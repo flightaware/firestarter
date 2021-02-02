@@ -40,7 +40,7 @@ const App = () => {
                         <Route path={`/airport/:code`} component={AirportPage} />
                         <Route path={`/findflight/:origin/:destination`} component={FindFlight} />
                         <Route path={`/flightinfo/:flight`} component={FlightInfo} ></Route>
-                        <Route path={`/flightinfo/`} component={FlightInfo} ></Route>
+                        <Route path={`/flightinfo/random`} component={FlightInfo} ></Route>
                     </Switch>
                 </div>
             </Router>
