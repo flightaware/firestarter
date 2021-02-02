@@ -7,8 +7,8 @@ uses a sqlite database located on a Docker named volume. This allows the
 database file (located at `/home/firestarter/db/flights.db`) to persist between
 container restarts and allows sharing the database file with the fids
 component. Db-updater uses TimescaleDB for positions. TimescaleDB is a
-time-series database, so it is very effecient in handling time-series data like
-positions. It is also an extention of PostgreSQL, which has been fully tested
+time-series database, so it is very efficient in handling time-series data like
+positions. It is also an extension of PostgreSQL, which has been fully tested
 in db-updater.
 
 When starting db-updater, it checks the database it's connected to ensure that
