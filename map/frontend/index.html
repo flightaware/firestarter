@@ -57,12 +57,6 @@
 							})
 						};
 						active_flights.set(msg.id, flight_info);
-						active_flights.get(msg.id).marker.addListener("click", () => {
-							// FIXME: This is janky, not really sure how to
-							// inject the proper host:port (since port is
-							// dynamically determined)
-							window.open(`http://gogan.hou.flightaware.com:5031/flightinfo/${msg.id}`);
-						});
 						active_flights.get(msg.id).marker.addListener("mouseover", (event) => {
 							for (i of info_windows) {
 								i.close();
