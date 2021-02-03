@@ -79,7 +79,7 @@ async def open_connection(
 
 def build_init_cmd(time_mode: str) -> str:
     """Builds the init command based on the environment variables provided in docker-compose"""
-    initiation_command = f"{time_mode} username {USERNAME} password {APIKEY}"
+    initiation_command = f"{time_mode} username {USERNAME} password {APIKEY} useragent firestarter"
     if COMPRESSION != "":
         initiation_command += f" compression {COMPRESSION}"
     if KEEPALIVE != "":
