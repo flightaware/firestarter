@@ -75,8 +75,8 @@ class TestReconnect(unittest.TestCase):
             self.assertEqual(
                 self.init_cmds,
                 [
-                    b"live username testuser password testapikey keepalive 60\n",
-                    b"live username testuser password testapikey keepalive 60\n",
+                    b"live username testuser password testapikey useragent firestarter keepalive 60\n",
+                    b"live username testuser password testapikey useragent firestarter keepalive 60\n",
                 ],
             )
             # verify expect output to kafka
@@ -86,8 +86,8 @@ class TestReconnect(unittest.TestCase):
             self.assertEqual(
                 self.init_cmds,
                 [
-                    b"live username testuser password testapikey keepalive 60\n",
-                    b"pitr 1584126630 username testuser password testapikey keepalive 60\n",
+                    b"live username testuser password testapikey useragent firestarter keepalive 60\n",
+                    b"pitr 1584126630 username testuser password testapikey useragent firestarter keepalive 60\n",
                 ],
             )
             # verify expect output to kafka
