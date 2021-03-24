@@ -14,10 +14,10 @@ on:
     # Allow manually triggered builds too.
 
 env:
-  CONNECTOR_IMAGE_NAME: firestarter_connector
-  DB-UPDATER_IMAGE_NAME: firestarter_db-updater
-  FIDS_IMAGE_NAME: firestarter_fids
-  MAP_IMAGE_NAME: firestarter_map
+  CONNECTOR_IMAGE_NAME: connector
+  DB-UPDATER_IMAGE_NAME: db-updater
+  FIDS_IMAGE_NAME: fids
+  MAP_IMAGE_NAME: map
   FH_USERNAME: dummy
   FH_APIKEY: dummy
 
@@ -51,21 +51,5 @@ jobs:
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
       - name: Push images
-        run: |
-          CONNECTOR_IMAGE_ID=ghcr.io/${{ github.repository }}/$CONNECTOR_IMAGE_NAME
-          DB-UPDATER_IMAGE_ID=ghcr.io/${{ github.repository }}/$DB-UPDATER_IMAGE_NAME
-          FIDS_IMAGE_ID=ghcr.io/${{ github.repository }}/$FIDS_IMAGE_NAME
-          MAP_IMAGE_ID=ghcr.io/${{ github.repository }}/$MAP_IMAGE_NAME
-
-          # Change all uppercase to lowercase
-          CONNECTOR_IMAGE_ID=$(echo $CONNECTOR_IMAGE_ID | tr '[A-Z]' '[a-z]')
-          DB-UPDATER_IMAGE_ID=$(echo $DB-UPDATER_IMAGE_ID | tr '[A-Z]' '[a-z]')
-          FIDS_IMAGE_ID=$(echo $FIDS_IMAGE_ID | tr '[A-Z]' '[a-z]')
-          MAP_IMAGE_ID=$(echo $MAP_IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-          echo CONNECTOR_IMAGE_ID=$CONNECTOR_IMAGE_ID
-          echo DB-UPDATER_IMAGE_ID=$DB-UPDATER_IMAGE_ID
-          echo FIDS_IMAGE_ID=$FIDS_IMAGE_ID
-          echo MAP_IMAGE_ID=$MAP_IMAGE_ID
-
+        run: 
           docker-compose push $CONNECTOR_IMAGE_NAME $DB-UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
