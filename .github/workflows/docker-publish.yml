@@ -18,6 +18,8 @@ env:
   DB-UPDATER_IMAGE_NAME: firestarter_db-updater
   FIDS_IMAGE_NAME: firestarter_fids
   MAP_IMAGE_NAME: firestarter_map
+  FH_USERNAME: dummy
+  FH_APIKEY: dummy
 
 jobs:
   # Push image to GitHub Packages.
