@@ -1,0 +1,69 @@
+name: Publish Docker image
+
+on:
+  push:
+    # Publish `master` as Docker `latest` image.
+    branches:
+      - master
+
+    # Publish `v1.2.3` tags as releases.
+    tags:
+      - v*
+
+  workflow_dispatch:
+    # Allow manually triggered builds too.
+
+env:
+  CONNECTOR_IMAGE_NAME: firestarter_connector
+  DB-UPDATER_IMAGE_NAME: firestarter_db-updater
+  FIDS_IMAGE_NAME: firestarter_fids
+  MAP_IMAGE_NAME: firestarter_map
+
+jobs:
+  # Push image to GitHub Packages.
+  # See also https://docs.docker.com/docker-hub/builds/
+  push:
+
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build images
+        run: |
+          # Strip git ref prefix from version
+          FS_VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && FS_VERSION=$(echo $FS_VERSION | sed -e 's/^v//')
+
+          # Use Docker `latest` tag convention
+          [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
+
+          echo FS_VERSION=$FS_VERSION
+
+          docker-compose build --parallel --build-arg FS_VERSION=$FS_VERSION $CONNECTOR_IMAGE_NAME $DB-UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
+
+      - name: Log into registry
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+
+      - name: Push images
+        run: |
+          CONNECTOR_IMAGE_ID=ghcr.io/${{ github.repository }}/$CONNECTOR_IMAGE_NAME
+          DB-UPDATER_IMAGE_ID=ghcr.io/${{ github.repository }}/$DB-UPDATER_IMAGE_NAME
+          FIDS_IMAGE_ID=ghcr.io/${{ github.repository }}/$FIDS_IMAGE_NAME
+          MAP_IMAGE_ID=ghcr.io/${{ github.repository }}/$MAP_IMAGE_NAME
+
+          # Change all uppercase to lowercase
+          CONNECTOR_IMAGE_ID=$(echo $CONNECTOR_IMAGE_ID | tr '[A-Z]' '[a-z]')
+          DB-UPDATER_IMAGE_ID=$(echo $DB-UPDATER_IMAGE_ID | tr '[A-Z]' '[a-z]')
+          FIDS_IMAGE_ID=$(echo $FIDS_IMAGE_ID | tr '[A-Z]' '[a-z]')
+          MAP_IMAGE_ID=$(echo $MAP_IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+          echo CONNECTOR_IMAGE_ID=$CONNECTOR_IMAGE_ID
+          echo DB-UPDATER_IMAGE_ID=$DB-UPDATER_IMAGE_ID
+          echo FIDS_IMAGE_ID=$FIDS_IMAGE_ID
+          echo MAP_IMAGE_ID=$MAP_IMAGE_ID
+
+          docker-compose push $CONNECTOR_IMAGE_NAME $DB-UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
