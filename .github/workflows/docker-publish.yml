@@ -15,7 +15,7 @@ on:
 
 env:
   CONNECTOR_IMAGE_NAME: connector
-  DB-UPDATER_IMAGE_NAME: db-updater
+  DB_UPDATER_IMAGE_NAME: db-updater
   FIDS_IMAGE_NAME: fids
   MAP_IMAGE_NAME: map
   FH_USERNAME: dummy
@@ -45,11 +45,11 @@ jobs:
 
           echo FS_VERSION=$FS_VERSION
 
-          docker-compose build --parallel --build-arg FS_VERSION=$FS_VERSION $CONNECTOR_IMAGE_NAME $DB-UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
+          docker-compose build --parallel --build-arg FS_VERSION=$FS_VERSION $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
 
       - name: Log into registry
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
       - name: Push images
         run: 
-          docker-compose push $CONNECTOR_IMAGE_NAME $DB-UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
+          docker-compose push $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
