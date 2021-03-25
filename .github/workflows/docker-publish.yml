@@ -43,7 +43,7 @@ jobs:
           # Use Docker `latest` tag convention
           [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
 
-          echo "export FS_VERSION=$FS_VERSION"
+          echo "FS_VERSION=$FS_VERSION" >> $GITHUB_ENV
 
           docker-compose build --parallel $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
 
