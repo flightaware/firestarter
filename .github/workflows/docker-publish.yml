@@ -43,9 +43,9 @@ jobs:
           # Use Docker `latest` tag convention
           [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
 
-          echo FS_VERSION=$FS_VERSION
+          echo "export FS_VERSION=$FS_VERSION"
 
-          docker-compose build --parallel --build-arg FS_VERSION=$FS_VERSION $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
+          docker-compose build --parallel $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
 
       - name: Log into registry
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
