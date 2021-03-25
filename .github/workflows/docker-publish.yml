@@ -20,6 +20,7 @@ env:
   MAP_IMAGE_NAME: map
   FH_USERNAME: dummy
   FH_APIKEY: dummy
+  FS_VERSION: latest
 
 jobs:
   # Push image to GitHub Packages.
@@ -44,6 +45,7 @@ jobs:
           [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
 
           echo "FS_VERSION=$FS_VERSION" >> $GITHUB_ENV
+          echo "${{ printenv }}"
 
           docker-compose build --parallel $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
 
