@@ -2,7 +2,7 @@ version: '3.7'
 
 services:
   connector:
-    image: "ghcr.io/flightaware/firestarter/firestarter_connector:${FS_VERSION:-latest}"
+    image: "ghcr.io/maryryang2/firestarter/firestarter_connector:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: connector/Dockerfile
@@ -51,7 +51,7 @@ services:
         max-file: "5"
 
   db-updater:
-    image: "ghcr.io/flightaware/firestarter/firestarter_db-updater:${FS_VERSION:-latest}"
+    image: "ghcr.io/maryryang2/firestarter/firestarter_db-updater:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: db-updater/Dockerfile
@@ -79,7 +79,7 @@ services:
         max-file: "5"
 
   position-db-updater:
-    image: "ghcr.io/flightaware/firestarter/firestarter_db-updater:${FS_VERSION:-latest}"
+    image: "ghcr.io/maryryang2/firestarter/firestarter_db-updater:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: db-updater/Dockerfile
@@ -107,7 +107,7 @@ services:
       - timescaledb
 
   fids:
-    image: "ghcr.io/flightaware/firestarter/firestarter_fids:${FS_VERSION:-latest}"
+    image: "ghcr.io/maryryang2/firestarter/firestarter_fids:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: fids/Dockerfile
@@ -133,7 +133,7 @@ services:
         max-file: "5"
 
   map:
-    image: "ghcr.io/flightaware/firestarter/firestarter_map:${FS_VERSION:-latest}"
+    image: "ghcr.io/maryryang2/firestarter/firestarter_map:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: map/Dockerfile
