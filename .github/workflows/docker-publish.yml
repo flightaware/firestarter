@@ -38,9 +38,6 @@ jobs:
           # Strip git ref prefix from version
           FS_VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
 
-          # Strip "v" prefix from tag name
-          [[ "${{ github.ref }}" == "refs/tags/"* ]] && FS_VERSION=$(echo $FS_VERSION | sed -e 's/^v//')
-
           # Use Docker `latest` tag convention
           [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
 
