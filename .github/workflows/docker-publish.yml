@@ -46,7 +46,7 @@ jobs:
           docker-compose build --parallel $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
 
       - name: Log into registry
-        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
 
       - name: Push images
         run: 
