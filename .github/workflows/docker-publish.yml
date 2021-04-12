@@ -1,0 +1,53 @@
+name: Publish Docker image
+
+on:
+  push:
+    # Publish `master` as Docker `latest` image.
+    branches:
+      - master
+
+    # Publish `v1.2.3` tags as releases.
+    tags:
+      - v*
+
+  workflow_dispatch:
+    # Allow manually triggered builds too.
+
+env:
+  CONNECTOR_IMAGE_NAME: connector
+  DB_UPDATER_IMAGE_NAME: db-updater
+  FIDS_IMAGE_NAME: fids
+  MAP_IMAGE_NAME: map
+  FH_USERNAME: dummy
+  FH_APIKEY: dummy
+  FS_VERSION: latest
+
+jobs:
+  # Push image to GitHub Packages.
+  # See also https://docs.docker.com/docker-hub/builds/
+  push:
+
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build images
+        run: |
+          # Strip git ref prefix from version
+          FS_VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+
+          # Use Docker `latest` tag convention
+          [ "$FS_VERSION" == "master" ] && FS_VERSION=latest
+
+          echo "FS_VERSION=$FS_VERSION" >> $GITHUB_ENV
+
+          docker-compose build --parallel $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
+
+      - name: Log into registry
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
+
+      - name: Push images
+        run: 
+          docker-compose push $CONNECTOR_IMAGE_NAME $DB_UPDATER_IMAGE_NAME $FIDS_IMAGE_NAME $MAP_IMAGE_NAME
