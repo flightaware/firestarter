@@ -1,6 +1,6 @@
 FROM python:3.8-slim-buster
 
-LABEL org.opencontainers.image.source https://github.com/flightaware/firestarter
+LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
 RUN apt-get update && \
 	apt-get install -y npm make && \
