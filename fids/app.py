@@ -7,6 +7,7 @@ from typing import Optional
 from flask import Flask, request, jsonify, abort, render_template, Response
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
+from sqlalchemy.sql.expression import text
 
 # pylint: disable=invalid-name
 flights_engine = sa.create_engine(os.environ["FLIGHTS_DB_URL"], echo=True)
@@ -89,8 +90,9 @@ def get_flight(flight_id: Optional[str] = None) -> dict:
 def get_busiest_airports() -> Response:
     """Get the busiest airport"""
     limit = request.args.get("limit", 10)
-    since = datetime.fromtimestamp(int(request.args.get("since", 0)), tz=UTC)
     query = request.args.get("query")
+    print(datetime.fromtimestamp(int(request.args.get("since", 0)), tz=UTC))
+    since = int(request.args.get("since", 0))
     if query:
         result = flights_engine.execute(
             union(
@@ -109,7 +111,8 @@ def get_busiest_airports() -> Response:
             row.origin
             for row in flights_engine.execute(
                 select([flights.c.origin])
-                .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) > since)
+                .where(func.coalesce(flights.c.actual_off, flights.c.actual_out) >
+                    (select([func.datetime(func.max(flights.c.actual_off), text(f"'-{since} hours'"))])))
                 .group_by(flights.c.origin)
                 .order_by(func.count().desc(), flights.c.origin)
                 .limit(limit)
@@ -122,7 +125,6 @@ def get_busiest_airports() -> Response:
 def airport_arrivals(airport: str) -> Response:
     """Get a list of arrivals for a certain airport"""
     airport = airport.upper()
-    dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     result = flights_engine.execute(
         flights.select().where(
             and_(
@@ -130,7 +132,7 @@ def airport_arrivals(airport: str) -> Response:
                 flights.c.flight_number != "BLOCKED",
                 func.coalesce(flights.c.actual_out, flights.c.actual_off) is not None,
                 func.coalesce(flights.c.actual_in, flights.c.actual_on, flights.c.cancelled)
-                > dropoff,
+                > (select([func.datetime(func.max(flights.c.actual_off), text(f"'-5 hours'"))])),
             )
         )
     )
@@ -143,13 +145,13 @@ def airport_arrivals(airport: str) -> Response:
 def airport_departures(airport: str) -> Response:
     """Get a list of departures for a certain airport"""
     airport = airport.upper()
-    dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
     result = flights_engine.execute(
         flights.select().where(
             and_(
                 flights.c.origin == airport,
                 flights.c.flight_number != "BLOCKED",
-                func.coalesce(flights.c.actual_out, flights.c.actual_off) > dropoff,
+                func.coalesce(flights.c.actual_out, flights.c.actual_off)
+                > (select([func.datetime(func.max(flights.c.actual_off), text(f"'-5 hours'"))])),
             )
         )
     )
@@ -164,8 +166,6 @@ def airport_departures(airport: str) -> Response:
 def airport_enroute(airport: str) -> Response:
     """Get a list of flights enroute to a certain airport"""
     airport = airport.upper()
-    past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
-    future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)
     result = flights_engine.execute(
         flights.select().where(
             and_(
@@ -173,7 +173,7 @@ def airport_enroute(airport: str) -> Response:
                 flights.c.flight_number != "BLOCKED",
                 func.coalesce(flights.c.actual_in, flights.c.actual_on, flights.c.cancelled)
                 == None,
-                flights.c.estimated_on.between(past_dropoff, future_dropoff),
+                flights.c.estimated_on.between(select([func.datetime(func.max(flights.c.actual_off), text(f"'-5 hours'"))]), select([func.datetime(func.max(flights.c.actual_off), text(f"'+6 hours'"))])),
             )
         )
     )
@@ -187,8 +187,6 @@ def airport_enroute(airport: str) -> Response:
 def airport_scheduled(airport: str) -> Response:
     """Get a list of scheduled flights from a certain airport"""
     airport = airport.upper()
-    past_dropoff = datetime.now(tz=UTC) - timedelta(hours=5)
-    future_dropoff = datetime.now(tz=UTC) + timedelta(hours=6)
     result = flights_engine.execute(
         flights.select().where(
             and_(
@@ -199,10 +197,10 @@ def airport_scheduled(airport: str) -> Response:
                     # You can actually get true_cancel'ed flights with an actual_out/off. Weird?
                     flights.c.true_cancel,
                 ),
-                flights.c.scheduled_off.between(past_dropoff, future_dropoff),
+                flights.c.scheduled_off.between(select([func.datetime(func.max(flights.c.actual_off), text(f"'-5 hours'"))]), select([func.datetime(func.max(flights.c.actual_off), text(f"'+6 hours'"))])),
                 or_(
                     flights.c.cancelled == None,
-                    and_(flights.c.true_cancel, flights.c.cancelled > past_dropoff),
+                    and_(flights.c.true_cancel, flights.c.cancelled > (select([func.datetime(func.max(flights.c.actual_off), text(f"'-5 hours'"))]))),
                 ),
             )
         )
