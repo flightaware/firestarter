@@ -91,7 +91,6 @@ def get_busiest_airports() -> Response:
     """Get the busiest airport"""
     limit = request.args.get("limit", 10)
     query = request.args.get("query")
-    print(datetime.fromtimestamp(int(request.args.get("since", 0)), tz=UTC))
     since = int(request.args.get("since", 0))
     if query:
         result = flights_engine.execute(
