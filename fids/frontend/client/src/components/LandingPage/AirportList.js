@@ -8,7 +8,7 @@ class AirportList extends Component {
     state = {
         topAirports: [],
         loading: true,
-        since: 60 * 60 * 1000
+        since: 1
     }
 
     componentDidMount() {
@@ -16,11 +16,7 @@ class AirportList extends Component {
     }
 
     fetchTopAirports(time) {
-
-        const now = Date.now();
-        const timeAgo = Math.floor((now - time) / 1000);
-
-        axios.get(`/airports/?limit=10&since=${timeAgo}`)
+        axios.get(`/airports/?limit=10&since=${time}`)
             .then(response => {
                 this.setState({
                     topAirports: response.data,
@@ -44,11 +40,11 @@ class AirportList extends Component {
 
         const timeIntervalText = (since) => {
             switch (since) {
-                case (60 * 60 * 1000):
+                case 1:
                     return "1 hour"
-                case ((60 * 60 * 1000) * 12):
+                case 12:
                     return "12 hours"
-                case ((60 * 60 * 1000) * 24):
+                case 24:
                     return "24 hours"
                 default:
                     return since
@@ -79,9 +75,9 @@ class AirportList extends Component {
                 </Container>
                 <Container className="radio-button-container">
                         <ButtonGroup className="w-100" toggle>
-                            <ToggleButton onChange={() => this.onRadioClick(60 * 60 * 1000)} type="radio" name="since" defaultChecked value={60 * 60 * 1000}>1 hour</ToggleButton>
-                            <ToggleButton onChange={() => this.onRadioClick((60 * 60 * 1000) * 12)} type="radio" name="since" value={(60 * 60 * 1000) * 12}>12 hours</ToggleButton>
-                            <ToggleButton onChange={() => this.onRadioClick((60 * 60 * 1000) * 24)} type="radio" name="since" value={(60 * 60 * 1000) * 24}>24 hours</ToggleButton>
+                            <ToggleButton onChange={() => this.onRadioClick(1)} type="radio" name="since" defaultChecked value={1}>1 hour</ToggleButton>
+                            <ToggleButton onChange={() => this.onRadioClick(12)} type="radio" name="since" value={12}>12 hours</ToggleButton>
+                            <ToggleButton onChange={() => this.onRadioClick(24)} type="radio" name="since" value={24}>24 hours</ToggleButton>
                         </ButtonGroup>
                 </Container>
                 </>
