@@ -37,22 +37,17 @@ while "positions" not in positions_insp.get_table_names():
     time.sleep(3)
 positions = sa.Table("positions", positions_meta, autoload_with=positions_engine)
 
-app = Flask(__name__, template_folder="frontend/build", static_folder="frontend/build/static")
-# Uncomment to enable serving the frontend separately (when testing, perhaps)
-# CORS(app)
+app = Flask(__name__)
 
 UTC = timezone.utc
 
 
-# Let frontend handle any unknown routes
+# Return a 404 for any unknown routes
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def catch_all(path):
     """Render HTML"""
-    # pylint: disable=unused-argument
-    return render_template(
-        "index.html", google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY", "")
-    )
+    abort(404)
 
 
 @app.route("/positions/<flight_id>")
