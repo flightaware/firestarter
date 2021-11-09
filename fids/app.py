@@ -233,4 +233,4 @@ def airport_scheduled(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000)
