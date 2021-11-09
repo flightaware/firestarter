@@ -2,7 +2,7 @@ FROM python:3.8-slim-buster
 
 LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
-RUN apt-get update && apt-get install -y libpq-dev gcc make sqlite3
+RUN apt-get update && apt-get install -y libpq-dev gcc make sqlite3 postgresql-client
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
