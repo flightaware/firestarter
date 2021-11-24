@@ -87,7 +87,7 @@ if TABLE == "flights":
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
     )
-    VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo"}
+    VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo", "flifo"}
 elif TABLE == "positions":
     table = sa.Table(
         "positions",
