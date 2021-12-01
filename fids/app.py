@@ -37,6 +37,8 @@ while "positions" not in positions_insp.get_table_names():
     time.sleep(3)
 positions = sa.Table("positions", positions_meta, autoload_with=positions_engine)
 
+google_maps_api_key = os.environ["GOOGLE_MAPS_API_KEY"]
+
 app = Flask(__name__)
 
 UTC = timezone.utc
@@ -50,7 +52,7 @@ def catch_all(path):
     abort(404)
 
 
-@app.route("/positions/<flight_id>")
+@app.route("/api/positions/<flight_id>")
 def get_positions(flight_id: str) -> dict:
     """Get positions for a specific flight_id"""
     result = positions_engine.execute(
@@ -61,8 +63,8 @@ def get_positions(flight_id: str) -> dict:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/flights/")
-@app.route("/flights/<flight_id>")
+@app.route("/api/flights/")
+@app.route("/api/flights/<flight_id>")
 def get_flight(flight_id: Optional[str] = None) -> dict:
     """Get info for a specific flight_id"""
     if flight_id is None:
@@ -81,7 +83,7 @@ def get_flight(flight_id: Optional[str] = None) -> dict:
     return dict(result)
 
 
-@app.route("/airports/")
+@app.route("/api/airports/")
 def get_busiest_airports() -> Response:
     """Get the busiest airport"""
     limit = request.args.get("limit", 10)
@@ -125,7 +127,7 @@ def get_busiest_airports() -> Response:
     )
 
 
-@app.route("/airports/<airport>/arrivals")
+@app.route("/api/airports/<airport>/arrivals")
 def airport_arrivals(airport: str) -> Response:
     """Get a list of arrivals for a certain airport"""
     airport = airport.upper()
@@ -145,7 +147,7 @@ def airport_arrivals(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/airports/<airport>/departures")
+@app.route("/api/airports/<airport>/departures")
 def airport_departures(airport: str) -> Response:
     """Get a list of departures for a certain airport"""
     airport = airport.upper()
@@ -165,8 +167,8 @@ def airport_departures(airport: str) -> Response:
 
 
 # pylint: disable=singleton-comparison
-@app.route("/airports/<airport>/enroute")
-@app.route("/airports/<airport>/scheduledto")
+@app.route("/api/airports/<airport>/enroute")
+@app.route("/api/airports/<airport>/scheduledto")
 def airport_enroute(airport: str) -> Response:
     """Get a list of flights enroute to a certain airport"""
     airport = airport.upper()
@@ -189,8 +191,8 @@ def airport_enroute(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/airports/<airport>/scheduled")
-@app.route("/airports/<airport>/scheduledfrom")
+@app.route("/api/airports/<airport>/scheduled")
+@app.route("/api/airports/<airport>/scheduledfrom")
 def airport_scheduled(airport: str) -> Response:
     """Get a list of scheduled flights from a certain airport"""
     airport = airport.upper()
@@ -227,5 +229,10 @@ def airport_scheduled(airport: str) -> Response:
         abort(404)
     return jsonify([dict(e) for e in result])
 
+
+@app.route("/api/mapskey")
+def map_proxy() -> Response:
+    """Get the google maps api key"""
+    return google_maps_api_key
 
 app.run(host="0.0.0.0", port=5000, debug=True)
