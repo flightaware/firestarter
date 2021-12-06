@@ -12,6 +12,7 @@ env = patch.dict(
     {
         "FLIGHTS_DB_URL": "sqlite:///test/db/flights.db",
         "POSITIONS_DB_URL": "sqlite:///test/db/positions.db",
+        "GOOGLE_MAPS_API_KEY": "",
     },
 )
 # with env, patch('flask.Flask') as mock_flask:
