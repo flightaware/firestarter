@@ -1,6 +1,6 @@
 """Read flight information from database and display it on a webpage"""
 
-from datetime import timezone
+from datetime import datetime, timezone
 import os
 import time
 from typing import Optional
