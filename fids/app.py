@@ -1,10 +1,10 @@
 """Read flight information from database and display it on a webpage"""
 
-from datetime import datetime, timezone
+from datetime import timezone
 import os
 import time
 from typing import Optional
-from flask import Flask, request, jsonify, abort, render_template, Response
+from flask import Flask, request, jsonify, abort, Response
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 from sqlalchemy.sql.expression import text # type: ignore
