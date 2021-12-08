@@ -44,15 +44,7 @@ app = Flask(__name__)
 UTC = timezone.utc
 
 
-# Return a 404 for any unknown routes
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def catch_all(path):
-    """Render HTML"""
-    abort(404)
-
-
-@app.route("/api/positions/<flight_id>")
+@app.route("/positions/<flight_id>")
 def get_positions(flight_id: str) -> dict:
     """Get positions for a specific flight_id"""
     result = positions_engine.execute(
@@ -63,8 +55,8 @@ def get_positions(flight_id: str) -> dict:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/api/flights/")
-@app.route("/api/flights/<flight_id>")
+@app.route("/flights/")
+@app.route("/flights/<flight_id>")
 def get_flight(flight_id: Optional[str] = None) -> dict:
     """Get info for a specific flight_id"""
     if flight_id is None:
@@ -83,7 +75,7 @@ def get_flight(flight_id: Optional[str] = None) -> dict:
     return dict(result)
 
 
-@app.route("/api/airports/")
+@app.route("/airports/")
 def get_busiest_airports() -> Response:
     """Get the busiest airport"""
     limit = request.args.get("limit", 10)
@@ -127,7 +119,7 @@ def get_busiest_airports() -> Response:
     )
 
 
-@app.route("/api/airports/<airport>/arrivals")
+@app.route("/airports/<airport>/arrivals")
 def airport_arrivals(airport: str) -> Response:
     """Get a list of arrivals for a certain airport"""
     airport = airport.upper()
@@ -147,7 +139,7 @@ def airport_arrivals(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/api/airports/<airport>/departures")
+@app.route("/airports/<airport>/departures")
 def airport_departures(airport: str) -> Response:
     """Get a list of departures for a certain airport"""
     airport = airport.upper()
@@ -167,8 +159,8 @@ def airport_departures(airport: str) -> Response:
 
 
 # pylint: disable=singleton-comparison
-@app.route("/api/airports/<airport>/enroute")
-@app.route("/api/airports/<airport>/scheduledto")
+@app.route("/airports/<airport>/enroute")
+@app.route("/airports/<airport>/scheduledto")
 def airport_enroute(airport: str) -> Response:
     """Get a list of flights enroute to a certain airport"""
     airport = airport.upper()
@@ -191,8 +183,8 @@ def airport_enroute(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/api/airports/<airport>/scheduled")
-@app.route("/api/airports/<airport>/scheduledfrom")
+@app.route("/airports/<airport>/scheduled")
+@app.route("/airports/<airport>/scheduledfrom")
 def airport_scheduled(airport: str) -> Response:
     """Get a list of scheduled flights from a certain airport"""
     airport = airport.upper()
@@ -230,8 +222,8 @@ def airport_scheduled(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/api/mapskey")
-def map_proxy() -> Response:
+@app.route("/mapskey")
+def get_map_api_key() -> Response:
     """Get the google maps api key"""
     return google_maps_api_key
 
