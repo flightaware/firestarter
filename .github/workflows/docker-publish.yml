@@ -16,7 +16,7 @@ on:
 env:
   CONNECTOR_IMAGE_NAME: connector
   DB_UPDATER_IMAGE_NAME: db-updater
-  FIDS_IMAGE_NAME: fids
+  FIDS_IMAGE_NAME: fids-backend
   MAP_IMAGE_NAME: map
   FH_USERNAME: dummy
   FH_APIKEY: dummy

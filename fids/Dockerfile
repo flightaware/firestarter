@@ -13,13 +13,6 @@ COPY --chown=firestarter Makefile.inc .
 RUN mkdir app
 WORKDIR /home/firestarter/app
 
-COPY --chown=firestarter fids/frontend/client frontend
-RUN cd frontend && \
-	npm install --no-optional && \
-	npm cache clean --force && \
-	npm run build && \
-	rm -rf node_modules
-
 RUN mkdir db
 COPY --chown=firestarter fids/requirements ./requirements
 COPY --chown=firestarter fids/Makefile .
