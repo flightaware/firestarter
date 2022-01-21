@@ -106,26 +106,38 @@ services:
     depends_on:
       - timescaledb
 
-  fids:
+  fids-backend:
     image: "ghcr.io/flightaware/firestarter/firestarter_fids:${FS_VERSION:-latest}"
     build:
       context: .
       dockerfile: fids/Dockerfile
     init: true
-    ports:
-      # Port upon which to serve webapp
-      - "${WEB_SERVER_PORT:-5000}:5000"
     networks:
-      - internal
+      internal:
+        aliases:
+          - fids-backend
     environment:
       # URL to database that is being updated by db-updater.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
       - FLIGHTS_DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
       - POSITIONS_DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
-      - GOOGLE_MAPS_API_KEY
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
       - PYTHONUNBUFFERED=1
     volumes:
       - data:/home/firestarter/app/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+  fids-frontend:
+    image: "ghcr.io/flightaware/fids_frontend/fids-frontend:${FIDS_VERSION:-latest}"
+    ports:
+      # Port upon which to serve webapp
+      - "${WEB_SERVER_PORT:-8080}:80"
+    networks:
+      - internal
     logging:
       driver: "json-file"
       options:

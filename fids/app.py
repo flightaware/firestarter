@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import os
 import time
 from typing import Optional
-from flask import Flask, request, jsonify, abort, render_template, Response
+from flask import Flask, request, jsonify, abort, Response
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 from sqlalchemy.sql.expression import text # type: ignore
@@ -37,22 +37,11 @@ while "positions" not in positions_insp.get_table_names():
     time.sleep(3)
 positions = sa.Table("positions", positions_meta, autoload_with=positions_engine)
 
-app = Flask(__name__, template_folder="frontend/build", static_folder="frontend/build/static")
-# Uncomment to enable serving the frontend separately (when testing, perhaps)
-# CORS(app)
+google_maps_api_key = os.environ["GOOGLE_MAPS_API_KEY"]
+
+app = Flask(__name__)
 
 UTC = timezone.utc
-
-
-# Let frontend handle any unknown routes
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def catch_all(path):
-    """Render HTML"""
-    # pylint: disable=unused-argument
-    return render_template(
-        "index.html", google_maps_api_key=os.environ.get("GOOGLE_MAPS_API_KEY", "")
-    )
 
 
 @app.route("/positions/<flight_id>")
@@ -232,5 +221,10 @@ def airport_scheduled(airport: str) -> Response:
         abort(404)
     return jsonify([dict(e) for e in result])
 
+
+@app.route("/mapskey")
+def get_map_api_key() -> Response:
+    """Get the google maps api key"""
+    return google_maps_api_key
 
 app.run(host="0.0.0.0", port=5000)

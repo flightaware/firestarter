@@ -1,10 +1,9 @@
-FROM python:3.8-slim-buster
+FROM python:3.8-slim-bullseye
 
 LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
 RUN apt-get update && \
-	apt-get install -y libpq-dev gcc npm make && \
-	npm install npm@latest -g
+	apt-get install -y libpq-dev gcc npm make
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
@@ -13,13 +12,6 @@ COPY --chown=firestarter Makefile.inc .
 
 RUN mkdir app
 WORKDIR /home/firestarter/app
-
-COPY --chown=firestarter fids/frontend/client frontend
-RUN cd frontend && \
-	npm install --no-optional && \
-	npm cache clean --force && \
-	npm run build && \
-	rm -rf node_modules
 
 RUN mkdir db
 COPY --chown=firestarter fids/requirements ./requirements
