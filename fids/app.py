@@ -1,13 +1,17 @@
 """Read flight information from database and display it on a webpage"""
 
+from base64 import b64encode
 from datetime import datetime, timezone
 import os
 import time
-from typing import Optional
+from typing import Optional, Iterable
 from flask import Flask, request, jsonify, abort, Response
+import requests
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import union, select, func, and_, or_  # type: ignore
 from sqlalchemy.sql.expression import text # type: ignore
+
+import trig
 
 # pylint: disable=invalid-name
 flights_engine = sa.create_engine(os.environ["FLIGHTS_DB_URL"], echo=True)
@@ -44,13 +48,20 @@ app = Flask(__name__)
 UTC = timezone.utc
 
 
-@app.route("/positions/<flight_id>")
-def get_positions(flight_id: str) -> dict:
-    """Get positions for a specific flight_id"""
-    result = positions_engine.execute(
-        positions.select().where(positions.c.id == flight_id).order_by(positions.c.time.desc())
+def _get_positions(flight_id: str) -> Iterable:
+    return (
+        positions_engine.execute(
+            positions.select().where(positions.c.id == flight_id).order_by(positions.c.time.desc())
+        )
+        or []
     )
-    if result is None:
+
+
+@app.route("/positions/<flight_id>")
+def get_positions(flight_id: str) -> Response:
+    """Get positions for a specific flight_id"""
+    result = _get_positions(flight_id)
+    if not result:
         abort(404)
     return jsonify([dict(e) for e in result])
 
@@ -222,9 +233,31 @@ def airport_scheduled(airport: str) -> Response:
     return jsonify([dict(e) for e in result])
 
 
-@app.route("/mapskey")
-def get_map_api_key() -> Response:
-    """Get the google maps api key"""
-    return google_maps_api_key
+@app.route("/map/<flight_id>")
+def get_map(flight_id: str) -> bytes:
+    """Get a static map image of the specified flight. Returned as a
+    base64-encoded image"""
+    positions = list(_get_positions(flight_id))
+    if not positions:
+        abort(404)
+    bearing = 0
+    if len(positions) > 1:
+        coord1 = (float(positions[1].latitude), float(positions[1].longitude))
+        coord2 = (float(positions[0].latitude), float(positions[0].longitude))
+        bearing = trig.get_cardinal_for_angle(trig.get_bearing_degrees(coord1, coord2))
+    coords = "|".join(f"{pos.latitude},{pos.longitude}" for pos in positions)
+
+    google_maps_url = "https://maps.googleapis.com/maps/api/staticmap"
+    google_maps_params = {
+        "size": "640x400",
+        "markers": f"anchor:center|icon:https://github.com/flightaware/fids_frontend/raw/master/images/aircraft_{bearing}.png|{positions[0].latitude},{positions[0].longitude}",
+        "path": f"color:0x0000ff|weight:5|{coords}",
+        "key": google_maps_api_key,
+    }
+    response = requests.get(google_maps_url, google_maps_params)
+    response.raise_for_status()
+    image = b64encode(response.content)
+    return image
+
 
 app.run(host="0.0.0.0", port=5000)

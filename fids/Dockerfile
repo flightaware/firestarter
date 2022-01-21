@@ -25,5 +25,6 @@ ENV VIRTUAL_ENV=./venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY --chown=firestarter fids/app.py .
+COPY --chown=firestarter fids/trig.py .
 
 CMD ["python3", "app.py"]
