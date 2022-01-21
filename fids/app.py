@@ -227,4 +227,4 @@ def get_map_api_key() -> Response:
     """Get the google maps api key"""
     return google_maps_api_key
 
-app.run(host="0.0.0.0", port=5000, debug=True)
+app.run(host="0.0.0.0", port=5000)
