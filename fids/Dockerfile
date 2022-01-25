@@ -3,7 +3,7 @@ FROM python:3.8-slim-bullseye
 LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
 RUN apt-get update && \
-	apt-get install -y libpq-dev gcc npm make
+	apt-get install -y libpq-dev make
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter
@@ -25,5 +25,6 @@ ENV VIRTUAL_ENV=./venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 COPY --chown=firestarter fids/app.py .
+COPY --chown=firestarter fids/trig.py .
 
 CMD ["python3", "app.py"]
