@@ -1,12 +1,16 @@
 """Forward flight events via SSE"""
 
+import json
+import logging
 import os
 import random
+import time
 
 from confluent_kafka import KafkaException, Consumer  # type: ignore
 from flask import Flask, Response, render_template, request
 
 
+logging.basicConfig(level="INFO")
 app = Flask(__name__, template_folder="frontend", static_folder="frontend/static")
 
 @app.route("/")
@@ -20,6 +24,14 @@ def index():
 def listen():
     group = request.headers.get("Last-Event-ID", f"{os.environ['KAFKA_GROUP_NAME']}{random.randint(0, 10**9)}")
     live = 'live' in request.args
+    # This is how many times faster than realtime we should emit messages.
+    # It won't look particularly fun until you get over 120x (Firehose can
+    # generally support that rate for worldwide traffic, perhaps higher with
+    # some filters in place). If you wait a bit and let the kafka topics fill
+    # up then you can pretty easily get over 1000x.
+    scale = int(request.args.get("scale", 1))
+    logging.info(f"Emitting events at {scale}x realtime")
+
     def stream():
         innergroup = group
         consumer = None
@@ -42,17 +54,32 @@ def listen():
             except (KafkaException, OSError) as error:
                 # Consider providing some sort of status update to listener
                 time.sleep(3)
+        first_time = None
+        first_pitr = None
         while True:
+            real_time = time.monotonic()
             # Polling will mask SIGINT, just fyi
             messagestr = consumer.poll(timeout=1.0)
             if messagestr is None:
                 # poll timed out
+                logging.debug("poll timeout")
                 continue
             if messagestr.error():
                 # Consider providing to listener
                 print(f"Encountered kafka error: {messagestr.error()}")
                 # They continue in the examples, so let's do it as well
                 continue
+            pitr = int(json.loads(messagestr.value().decode())["pitr"])
+            if first_time is None:
+                first_pitr = pitr
+                first_time = real_time
+            elif pitr - first_pitr > (real_time - first_time) * scale:
+                # If we see that the pitr is beyond real_time + offset * scale,
+                # we should wait until it would be appropriate to emit it
+                wait = ((pitr - first_pitr) - (real_time - first_time) * scale) / scale
+                logging.debug(f"Wait {wait:02f} seconds since pitr is ahead")
+                time.sleep(wait)
+            logging.debug(f"Emit {pitr}")
             yield as_sse(messagestr.value().decode(), id=innergroup)
             # Only send the id for the first message. We're kind of hijacking
             # the ID's purpose since it's really supposed to be unique per

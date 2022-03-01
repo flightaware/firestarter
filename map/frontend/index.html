@@ -40,7 +40,15 @@
 				info_windows.clear();
 			});
 			const start_live = {{ startlive|tojson }};
-			const url = start_live ? "listen?live" : "listen"
+			const params = new URLSearchParams(window.location.search)
+			const listen_params = new URLSearchParams();
+			if (start_live) {
+				listen_params.append("live");
+			}
+			if (params.has("scale")) {
+				listen_params.append("scale", params.get("scale"))
+			}
+			let url = `listen?${listen_params.toString()}`
 			const evtSource = new EventSource(url);
 			evtSource.onmessage = function(event) {
 				const msg = JSON.parse(event.data);
