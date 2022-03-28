@@ -176,7 +176,7 @@ class TestCompression(unittest.TestCase):
         self.assertEqual(
             self.emitted_msg,
             [
-                b'{"pitr":"1647160200","type":"flifo","ident":"UAL1984","aircrafttype":"B739","dest":"MDSD","estimated_off":"1647346500","estimated_on":"1647358800","ete":"12300","facility_hash":"23D67E4254EC60CD","facility_name":"United Airlines","filed_ete":"12300","id":"UAL1984-1647160192-fa-0000","orig":"KEWR","reg":"N67812","scheduled_off":"1647346500","scheduled_on":"1647358800","filed_airspeed":"398","status":"S"}\n'
+                b'{"pitr":"1647160200","type":"flifo","ident":"RYR1005","dest":"LROP","actual_off":"1647159545","estimated_on":"1647170100","ete":"10555","facility_hash":"D5A46EA72EB25728","facility_name":"","id":"RYR1005-1646986800-schedule-0083","orig":"EGSS","reg":"EIEKI","scheduled_off":"1647159300","scheduled_departure_gate":"37","scheduled_out":"1647159300","status":"A"}\n'
             ],
         )
 
