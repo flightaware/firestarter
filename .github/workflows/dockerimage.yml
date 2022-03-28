@@ -59,6 +59,7 @@ jobs:
         env:
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
+          docker-compose build --parallel
           docker-compose up -d --build
           python3 -m pip install webdriver-manager
           python3 -m pip install selenium
