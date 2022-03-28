@@ -5,15 +5,8 @@ import warnings
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
-from unittest.mock import patch, Mock, ANY
+from unittest.mock import patch, Mock, AsyncMock, ANY
 import main
-
-
-def CoroMock():
-    coro = Mock(name="CoroutineResult")
-    corofunc = Mock(name="CoroutineFunction", side_effect=asyncio.coroutine(coro))
-    corofunc.coro = coro
-    return corofunc
 
 
 class EndTestNow(Exception):
@@ -39,9 +32,9 @@ class TestReconnect(unittest.TestCase):
             },
         )
         self.mock_reader = Mock()
-        self.mock_reader.readline = CoroMock()
+        self.mock_reader.readline = AsyncMock()
         self.mock_writer = Mock()
-        self.mock_writer.drain = CoroMock()
+        self.mock_writer.drain = AsyncMock()
         self.mock_writer.write.side_effect = self.save_init_cmd_stop_test
 
     def tearDown(self):
@@ -58,13 +51,13 @@ class TestReconnect(unittest.TestCase):
     ):
         # mock setup
         if test_reconnect_live:
-            self.mock_reader.readline.coro.side_effect = [error]
+            self.mock_reader.readline.side_effect = [error]
         else:
-            self.mock_reader.readline.coro.side_effect = [
+            self.mock_reader.readline.side_effect = [
                 b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                 error,
             ]
-        mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
+        mock_openconnection.return_value = self.mock_reader, self.mock_writer
 
         # run test
         with self.assertRaises(EndTestNow), self.env:
@@ -98,41 +91,41 @@ class TestReconnect(unittest.TestCase):
                 callback=ANY,
             )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, b"")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b"")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             False, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             True, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, AttributeError)
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, AttributeError)
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
@@ -142,7 +135,7 @@ class TestReconnect(unittest.TestCase):
             b'{"pitr":"1584126630","type":"error","error_msg":"test error"}',
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
@@ -187,22 +180,22 @@ class TestCompression(unittest.TestCase):
             ],
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_no_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_gzip_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "gzip")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_compress_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "compress")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_deflate_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "deflate")
