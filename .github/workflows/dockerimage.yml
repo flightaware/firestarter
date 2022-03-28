@@ -32,8 +32,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Connector
         env:
-          INIT_CMD_TIME: "pitr 1584126630"
-          INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation\""
+          INIT_CMD_TIME: "pitr 1647160200"
+          INIT_CMD_ARGS: "events \"flifo\""
           KAFKA_TOPIC_NAME: feed1
         run: |
           cd connector
