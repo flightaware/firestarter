@@ -70,7 +70,7 @@ jobs:
       - name: Performance
         env:
           INIT_CMD_TIME: "pitr 1647160200"
-          INIT_CMD_ARGS: "events \"flifo departure arrival cancellation position\""
+          INIT_CMD_ARGS: "events \"flifo flightplan departure arrival cancellation position\""
         run: |
           docker-compose up -d
           ./ci_performance_regression_test.sh
