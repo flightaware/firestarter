@@ -72,6 +72,6 @@ jobs:
           INIT_CMD_TIME: "pitr 1577880000"
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
-          docker-compose up -d --build
+          docker-compose up -d
           ./ci_performance_regression_test.sh
           
