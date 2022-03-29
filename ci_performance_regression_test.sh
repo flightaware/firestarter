@@ -2,7 +2,7 @@
 
 start=$(date +%s)
 
-sleep 10
+sleep 300
 
 dbupdater_container=$(docker ps | grep firestarter_db-updater_1 | awk 'NF>1{print $NF}')
 flights_count=$(docker exec -i ${dbupdater_container} sqlite3 /home/firestarter/app/db/flights.db 'SELECT COUNT(*) FROM flights')
