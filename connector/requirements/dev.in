@@ -1,4 +1,4 @@
 -c base.txt
-mypy==0.942
+mypy
 black
-pylint==2.4.4
+pylint
