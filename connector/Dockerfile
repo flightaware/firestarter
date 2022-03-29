@@ -1,8 +1,8 @@
-FROM python:3.8-slim-buster
+FROM python:3.9-slim-bullseye
 
 LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
-RUN apt-get update && apt-get install -y make
+RUN apt-get update && apt-get install -y build-essential librdkafka-dev
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
 USER firestarter
 WORKDIR /home/firestarter

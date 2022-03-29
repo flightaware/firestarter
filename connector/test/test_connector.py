@@ -5,15 +5,8 @@ import warnings
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
-from unittest.mock import patch, Mock, ANY
+from unittest.mock import patch, Mock, AsyncMock, ANY
 import main
-
-
-def CoroMock():
-    coro = Mock(name="CoroutineResult")
-    corofunc = Mock(name="CoroutineFunction", side_effect=asyncio.coroutine(coro))
-    corofunc.coro = coro
-    return corofunc
 
 
 class EndTestNow(Exception):
@@ -39,9 +32,9 @@ class TestReconnect(unittest.TestCase):
             },
         )
         self.mock_reader = Mock()
-        self.mock_reader.readline = CoroMock()
+        self.mock_reader.readline = AsyncMock()
         self.mock_writer = Mock()
-        self.mock_writer.drain = CoroMock()
+        self.mock_writer.drain = AsyncMock()
         self.mock_writer.write.side_effect = self.save_init_cmd_stop_test
 
     def tearDown(self):
@@ -58,13 +51,13 @@ class TestReconnect(unittest.TestCase):
     ):
         # mock setup
         if test_reconnect_live:
-            self.mock_reader.readline.coro.side_effect = [error]
+            self.mock_reader.readline.side_effect = [error]
         else:
-            self.mock_reader.readline.coro.side_effect = [
+            self.mock_reader.readline.side_effect = [
                 b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                 error,
             ]
-        mock_openconnection.coro.return_value = self.mock_reader, self.mock_writer
+        mock_openconnection.return_value = self.mock_reader, self.mock_writer
 
         # run test
         with self.assertRaises(EndTestNow), self.env:
@@ -98,41 +91,41 @@ class TestReconnect(unittest.TestCase):
                 callback=ANY,
             )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, b"")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_eof(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, b"")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             False, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_timeout(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
             True, mock_kafkaproducer, mock_openconnection, asyncio.TimeoutError
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(False, mock_kafkaproducer, mock_openconnection, AttributeError)
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_disconnect(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(True, mock_kafkaproducer, mock_openconnection, AttributeError)
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
@@ -142,7 +135,7 @@ class TestReconnect(unittest.TestCase):
             b'{"pitr":"1584126630","type":"error","error_msg":"test error"}',
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_live_error_msg(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
@@ -183,26 +176,26 @@ class TestCompression(unittest.TestCase):
         self.assertEqual(
             self.emitted_msg,
             [
-                b'{"pitr":"1584126630","type":"flightplan","ident":"DAL3120","aircrafttype":"B739","alt":"37000","dest":"KMSP","edt":"1584188640","eta":"1584193723","ete":"5083","facility_hash":"81E755935A704D47","facility_name":"","fdt":"1584187800","id":"DAL3120-1583991944-airline-0270","orig":"KDEN","reg":"N908DN","route":"KDEN.YOKES7.CHICI..HAAND..ONL..FSD..SSWAN.TORGY3.KMSP","speed":"418","status":"S","waypoints":[{"lat":39.86000,"lon":-104.67000},{"lat":39.87000,"lon":-104.63000},{"lat":39.89000,"lon":-104.52000},{"lat":39.91000,"lon":-104.43000},{"lat":39.97000,"lon":-104.38000},{"lat":39.99000,"lon":-104.38000},{"lat":40.06000,"lon":-104.38000},{"lat":40.14000,"lon":-104.46000},{"lat":40.18000,"lon":-104.49000},{"lat":40.19000,"lon":-104.51000},{"lat":40.30000,"lon":-104.50000},{"lat":40.34000,"lon":-104.46000},{"lat":40.42000,"lon":-104.38000},{"lat":40.44000,"lon":-104.36000},{"lat":40.58000,"lon":-104.24000},{"lat":40.58000,"lon":-104.23000},{"lat":40.59000,"lon":-104.22000},{"lat":40.60000,"lon":-104.20000},{"lat":40.66000,"lon":-104.14000},{"lat":40.72000,"lon":-104.06000},{"lat":40.77000,"lon":-103.99000},{"lat":40.87000,"lon":-103.86000},{"lat":41.13000,"lon":-103.53000},{"lat":41.25000,"lon":-103.37000},{"lat":41.40000,"lon":-103.17000},{"lat":41.57000,"lon":-102.26000},{"lat":41.65000,"lon":-101.96000},{"lat":41.72000,"lon":-101.69000},{"lat":42.33000,"lon":-99.29000},{"lat":42.47000,"lon":-98.69000},{"lat":43.37000,"lon":-97.24000},{"lat":43.65000,"lon":-96.78000},{"lat":44.16000,"lon":-95.95000},{"lat":44.23000,"lon":-95.76000},{"lat":44.32000,"lon":-95.53000},{"lat":44.46000,"lon":-95.18000},{"lat":44.48000,"lon":-95.08000},{"lat":44.50000,"lon":-95.02000},{"lat":44.55000,"lon":-94.79000},{"lat":44.55000,"lon":-94.77000},{"lat":44.58000,"lon":-94.66000},{"lat":44.64000,"lon":-94.38000},{"lat":44.67000,"lon":-94.24000},{"lat":44.68000,"lon":-94.23000},{"lat":44.70000,"lon":-94.12000},{"lat":44.73000,"lon":-94.00000},{"lat":44.75000,"lon":-93.89000},{"lat":44.79000,"lon":-93.73000},{"lat":44.83000,"lon":-93.52000},{"lat":44.85000,"lon":-93.43000},{"lat":44.78000,"lon":-93.26000},{"lat":44.75000,"lon":-93.19000},{"lat":44.68000,"lon":-93.04000},{"lat":44.72000,"lon":-93.07000},{"lat":44.79000,"lon":-93.13000},{"lat":44.86000,"lon":-93.20000},{"lat":44.88000,"lon":-93.22000}]}\n'
+                b'{"pitr":"1647160200","type":"flifo","ident":"RYR1005","dest":"LROP","actual_off":"1647159545","estimated_on":"1647170100","ete":"10555","facility_hash":"D5A46EA72EB25728","facility_name":"","id":"RYR1005-1646986800-schedule-0083","orig":"EGSS","reg":"EIEKI","scheduled_off":"1647159300","scheduled_departure_gate":"37","scheduled_out":"1647159300","status":"A"}\n'
             ],
         )
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_no_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_gzip_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "gzip")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_compress_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "compress")
 
-    @patch("main.open_connection", new_callable=CoroMock)
+    @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
     def test_deflate_compression(self, mock_kafkaproducer, mock_openconnection):
         self.compression(mock_kafkaproducer, mock_openconnection, "deflate")

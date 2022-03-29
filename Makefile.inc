@@ -6,7 +6,7 @@ venv: venv/bin/activate
 
 venv/bin/activate:
 	test -d venv || $(PYTHON) -m venv venv
-	. venv/bin/activate && $(PYTHON) -m pip install pip-tools
+	. venv/bin/activate && $(PYTHON) -m pip install pip-tools && $(PYTHON) -m pip install --upgrade setuptools
 
 pip-compile: venv
 	. venv/bin/activate && make -C requirements all

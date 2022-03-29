@@ -177,7 +177,7 @@ services:
       - zookeeper_data:/bitnami/zookeeper
 
   kafka:
-    image: "bitnami/kafka:2.5.0"
+    image: "bitnami/kafka:3.1"
     init: true
     networks:
       - internal
