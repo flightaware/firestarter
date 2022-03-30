@@ -31,6 +31,9 @@ services:
       # such message is received within roughly $keepalive seconds, connector
       # will automatically reconnect to Firehose.
       - KEEPALIVE=${KEEPALIVE:-60}
+      # The number of times that the same pitr seen in consecutive keeplives
+      # messages should trigger an error and a restart of the connection
+      - KEEPALIVE_STALE_PITRS=${KEEPALIVE_STALE_PITRS:-5}
       # "Time mode" of Firehose init command. Can be "live" or "pitr <pitr>";
       # range is currently not supported.
       # See https://flightaware.com/commercial/firehose/documentation/commands

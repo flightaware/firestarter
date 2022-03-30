@@ -17,6 +17,7 @@ COMPRESSION: str
 USERNAME: str
 APIKEY: str
 KEEPALIVE: int
+KEEPALIVE_STALE_PITRS: int
 INIT_CMD_ARGS: str
 INIT_CMD_TIME: str
 SERVERNAME: str
@@ -95,7 +96,7 @@ def parse_script_args() -> None:
     """Sets global variables based on the environment variables provided in docker-compose"""
     # pylint: disable=global-statement
     # pylint: disable=line-too-long
-    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, INIT_CMD_TIME, INIT_CMD_ARGS
+    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, KEEPALIVE_STALE_PITRS, INIT_CMD_TIME, INIT_CMD_ARGS
 
     # **** REQUIRED ****
     USERNAME = os.environ["FH_USERNAME"]
@@ -105,6 +106,7 @@ def parse_script_args() -> None:
     COMPRESSION = os.environ["COMPRESSION"]
     STATS_PERIOD = int(os.environ["PRINT_STATS_PERIOD"])
     KEEPALIVE = int(os.environ["KEEPALIVE"])
+    KEEPALIVE_STALE_PITRS = int(os.environ["KEEPALIVE_STALE_PITRS"])
     INIT_CMD_TIME = os.environ["INIT_CMD_TIME"]
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
@@ -203,6 +205,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     await fh_writer.drain()
 
     pitr = None
+    num_keepalives = 0
     while True:
         timeout = (KEEPALIVE + 10) if KEEPALIVE else None
         try:
@@ -220,6 +223,18 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         if message["type"] == "error":
             print(f'Error: {message["error_msg"]}')
             break
+
+        if message["type"] == "keepalive":
+            # if the pitr is the same as the last keepalive pitr, keep track of how long this is happening
+            if last_good_keepalive_pitr == message["pitr"]:
+                num_keepalives += 1
+            else:
+                num_keepalives = 0
+            if num_keepalives > KEEPALIVE_STALE_PITRS:
+                break
+            last_good_keepalive_pitr = message["pitr"]
+        else:
+            num_keepalives = 0
 
         last_good_pitr = pitr = message["pitr"]
 
