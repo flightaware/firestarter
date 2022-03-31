@@ -86,12 +86,15 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.produce.assert_called_once_with(
-                "topic1",
-                key=b"KPVD-1588929046-hexid-ADF994",
-                value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
-                callback=ANY,
-            )
+            if len(error) == 1:
+                mock_kafkaproducer.return_value.produce.assert_called_once_with(
+                    "topic1",
+                    key=b"KPVD-1588929046-hexid-ADF994",
+                    value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
+                    callback=ANY,
+                )
+            else:
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error))
 
     @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
