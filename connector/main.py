@@ -205,7 +205,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     await fh_writer.drain()
 
     pitr = None
-    num_keepalives = 0
+    num_keepalives, last_good_keepalive_pitr = 0, 0
     while True:
         timeout = (KEEPALIVE + 10) if KEEPALIVE else None
         try:
@@ -230,9 +230,10 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 num_keepalives += 1
             else:
                 num_keepalives = 0
-            if num_keepalives > KEEPALIVE_STALE_PITRS:
+            if num_keepalives >= KEEPALIVE_STALE_PITRS:
                 break
             last_good_keepalive_pitr = message["pitr"]
+            continue
         else:
             num_keepalives = 0
 
