@@ -105,8 +105,8 @@ def parse_script_args() -> None:
     SERVERNAME = os.environ["SERVER"]
     COMPRESSION = os.environ["COMPRESSION"]
     STATS_PERIOD = int(os.environ["PRINT_STATS_PERIOD"])
-    KEEPALIVE = int(os.environ["KEEPALIVE"])
-    KEEPALIVE_STALE_PITRS = int(os.environ["KEEPALIVE_STALE_PITRS"])
+    KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
+    KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
     INIT_CMD_TIME = os.environ["INIT_CMD_TIME"]
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
