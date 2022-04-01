@@ -24,6 +24,7 @@ class TestReconnect(unittest.TestCase):
                 "FH_USERNAME": "testuser",
                 "FH_APIKEY": "testapikey",
                 "KEEPALIVE": "60",
+                "KEEPALIVE_STALE_PITRS": "5",
                 "INIT_CMD_ARGS": "",
                 "INIT_CMD_TIME": "live",
                 "SERVER": "testserver",
@@ -50,13 +51,14 @@ class TestReconnect(unittest.TestCase):
         self, test_reconnect_live, mock_kafkaproducer, mock_openconnection, error
     ):
         # mock setup
+        if not isinstance(error, list):
+            error = [error]
         if test_reconnect_live:
-            self.mock_reader.readline.side_effect = [error]
+            self.mock_reader.readline.side_effect = error
         else:
             self.mock_reader.readline.side_effect = [
                 b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
-                error,
-            ]
+            ] + error
         mock_openconnection.return_value = self.mock_reader, self.mock_writer
 
         # run test
@@ -84,12 +86,15 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.produce.assert_called_once_with(
-                "topic1",
-                key=b"KPVD-1588929046-hexid-ADF994",
-                value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
-                callback=ANY,
-            )
+            if len(error) == 1:
+                mock_kafkaproducer.return_value.produce.assert_called_once_with(
+                    "topic1",
+                    key=b"KPVD-1588929046-hexid-ADF994",
+                    value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
+                    callback=ANY,
+                )
+            else:
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error))
 
     @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
@@ -144,6 +149,42 @@ class TestReconnect(unittest.TestCase):
             mock_openconnection,
             b'{"pitr":"1584126630","type":"error","error_msg":"test error"}',
         )
+
+    @patch("main.open_connection", new_callable=AsyncMock)
+    @patch("main.Producer", new_callable=Mock)
+    def test_pitr_drift_exceeded(self, mock_kafkaproducer, mock_openconnection):
+        self.reconnect_after_error(
+            False,
+            mock_kafkaproducer,
+            mock_openconnection,
+            [
+                b'{"pitr":"1584126630","type":"keepalive"}',
+                b'{"pitr":"1584126630","type":"keepalive"}',
+                b'{"pitr":"1584126630","type":"keepalive"}',
+                b'{"pitr":"1584126630","type":"keepalive"}',
+                b'{"pitr":"1584126630","type":"keepalive"}',
+                b'{"pitr":"1584126630","type":"keepalive"}',
+            ]
+        )
+
+    @patch("main.open_connection", new_callable=AsyncMock)
+    @patch("main.Producer", new_callable=Mock)
+    def test_pitr_drift_reset(self, mock_kafkaproducer, mock_openconnection):
+        # does not reconnect and is waiting for the next message
+        with self.assertRaises(StopAsyncIteration), self.env:
+            self.reconnect_after_error(
+                False,
+                mock_kafkaproducer,
+                mock_openconnection,
+                [
+                    b'{"pitr":"1584126630","type":"keepalive"}',
+                    b'{"pitr":"1584126630","type":"keepalive"}',
+                    b'{"pitr":"1584126630","type":"keepalive"}',
+                    b'{"pitr":"1584126630","type":"keepalive"}',
+                    b'{"pitr":"1584126630","type":"keepalive"}',
+                    b'{"pitr":"1584126631","type":"keepalive"}',
+                ]
+            )
 
 
 # THIS TEST WILL ONLY RUN IN TRAVIS

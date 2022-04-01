@@ -13,12 +13,14 @@ from confluent_kafka import KafkaException, Producer  # type: ignore
 
 CONNECTION_ERROR_LIMIT = 3
 
-COMPRESSION: str
 USERNAME: str
 APIKEY: str
-KEEPALIVE: int
+
+COMPRESSION: str
 INIT_CMD_ARGS: str
 INIT_CMD_TIME: str
+KEEPALIVE: int
+KEEPALIVE_STALE_PITRS: int
 SERVERNAME: str
 STATS_PERIOD: int
 
@@ -95,20 +97,21 @@ def parse_script_args() -> None:
     """Sets global variables based on the environment variables provided in docker-compose"""
     # pylint: disable=global-statement
     # pylint: disable=line-too-long
-    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, INIT_CMD_TIME, INIT_CMD_ARGS
+    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, KEEPALIVE_STALE_PITRS, INIT_CMD_TIME, INIT_CMD_ARGS
 
     # **** REQUIRED ****
     USERNAME = os.environ["FH_USERNAME"]
     APIKEY = os.environ["FH_APIKEY"]
     # **** NOT REQUIRED ****
-    SERVERNAME = os.environ["SERVER"]
-    COMPRESSION = os.environ["COMPRESSION"]
-    STATS_PERIOD = int(os.environ["PRINT_STATS_PERIOD"])
-    KEEPALIVE = int(os.environ["KEEPALIVE"])
-    INIT_CMD_TIME = os.environ["INIT_CMD_TIME"]
+    SERVERNAME = os.environ.get("SERVER", "firehose-test.flightaware.com")
+    COMPRESSION = os.environ.get("COMPRESSION", "")
+    STATS_PERIOD = int(os.environ.get("PRINT_STATS_PERIOD", "10"))
+    KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
+    KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
+    INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
-    INIT_CMD_ARGS = os.environ["INIT_CMD_ARGS"]
+    INIT_CMD_ARGS = os.environ.get("INIT_CMD_ARGS", "")
     for command in ["live", "pitr", "compression", "keepalive", "username", "password"]:
         if command in INIT_CMD_ARGS.split():
             raise ValueError(
@@ -203,6 +206,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     await fh_writer.drain()
 
     pitr = None
+    num_keepalives, last_good_keepalive_pitr = 0, 0
     while True:
         timeout = (KEEPALIVE + 10) if KEEPALIVE else None
         try:
@@ -220,6 +224,18 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         if message["type"] == "error":
             print(f'Error: {message["error_msg"]}')
             break
+
+        if message["type"] == "keepalive":
+            # if the pitr is the same as the last keepalive pitr, keep track of how long this is happening
+            if last_good_keepalive_pitr == message["pitr"]:
+                num_keepalives += 1
+            else:
+                num_keepalives = 0
+            if num_keepalives >= KEEPALIVE_STALE_PITRS:
+                break
+            last_good_keepalive_pitr = message["pitr"]
+        else:
+            num_keepalives = 0
 
         last_good_pitr = pitr = message["pitr"]
 
