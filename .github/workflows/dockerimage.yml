@@ -8,6 +8,7 @@ on:
 
 env:
   KEEPALIVE: 60
+  KEEPALIVE_STALE_PITRS: 5
   SERVER: firehose-test.flightaware.com
   PRINT_STATS_PERIOD: 0
   FH_USERNAME: ${{ secrets.FH_USERNAME }}
