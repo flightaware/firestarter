@@ -9,6 +9,9 @@ included, with more being developed (see [the roadmap](./ROADMAP.md) for
 details).
 
 ## Quickstart
+We suggest that you have at least 8GB of RAM and 30GB of available disk space 
+to run the full Firestarter stack.
+
 You must set the following variables (in your environment or a .env file)
 before you can start using Firestarter.
 * FH_USERNAME - Your FlightAware Firehose account username
