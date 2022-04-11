@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         node-version: [12.16.3]
-        python-version: [3.7]
+        python-version: [3.9]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
@@ -33,8 +33,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Connector
         env:
-          INIT_CMD_TIME: "pitr 1584126630"
-          INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation\""
+          INIT_CMD_TIME: "pitr 1647160200"
+          INIT_CMD_ARGS: "events \"flifo\""
           KAFKA_TOPIC_NAME: feed1
         run: |
           cd connector
@@ -60,7 +60,8 @@ jobs:
         env:
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
-          docker-compose up -d --build
+          docker-compose build --parallel
+          docker-compose up -d
           python3 -m pip install webdriver-manager
           python3 -m pip install selenium
           python3 ci_ping_frontend.py
@@ -72,6 +73,6 @@ jobs:
           INIT_CMD_TIME: "pitr 1577880000"
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
-          docker-compose up -d --build
+          docker-compose up -d
           ./ci_performance_regression_test.sh
           

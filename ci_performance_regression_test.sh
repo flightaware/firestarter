@@ -4,11 +4,13 @@ start=$(date +%s)
 
 sleep 300
 
-flights_count=$(docker exec -i $(docker ps | grep firestarter_db-updater_1 | awk 'NF>1{print $NF}') sqlite3 /home/firestarter/app/db/flights.db 'SELECT COUNT(*) FROM flights')
+dbupdater_container=$(docker ps | grep firestarter_db-updater_1 | awk 'NF>1{print $NF}')
+flights_count=$(docker exec -i ${dbupdater_container} sqlite3 /home/firestarter/app/db/flights.db 'SELECT COUNT(*) FROM flights')
 
-positions_count=$(docker exec -i $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT COUNT(*) FROM positions')
+timescaledb_container=$(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}')
+positions_count=$(docker exec -i ${timescaledb_container} psql -qAt -U postgres -c 'SELECT COUNT(*) FROM positions')
 
-positions_time_processed=$(docker exec -i $(docker ps | grep firestarter_timescaledb_1 | awk 'NF>1{print $NF}') psql -qAt -U postgres -c 'SELECT MAX(extract(epoch from time)) - MIN(extract(epoch from time)) as time_diff FROM positions' | tr -d '\r')
+positions_time_processed=$(docker exec -i ${timescaledb_container} psql -qAt -U postgres -c 'SELECT MAX(extract(epoch from time)) - MIN(extract(epoch from time)) as time_diff FROM positions' | tr -d '\r')
 
 end=$(date +%s)
 

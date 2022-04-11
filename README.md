@@ -43,9 +43,13 @@ each container. The services will log periodically as Firehose messages are
 received, while the sample webapps will produce some initial log output and
 then only log as requests are made to them.
 
-You can test out the FIDS sample application by visiting http://localhost:5000
+You can test out the FIDS sample application by visiting http://localhost:8080
 in your web browser (if not running Docker locally, use the Docker host's
 address). The map sample application can be accessed at http://localhost:5001.
+
+If you are running on Mac OS Monterrey or later, disable "AirPlay Receiver"
+in System Preferences > Sharing > AirPlay Receiver. It runs on port 5000,
+which is the same port as the FIDS backend application.
 
 
 ## Firestarter Components
