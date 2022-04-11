@@ -10,7 +10,9 @@ details).
 
 ## Quickstart
 We suggest that you have at least 8GB of RAM and 30GB of available disk space 
-to run the full Firestarter stack.
+to run the full Firestarter stack. In order to have more fine-grained control
+over memory usage, check the notes on how to configure the [timescaledb-tune](https://github.com/timescale/timescaledb-docker#notes-on-timescaledb-tune)
+parameters for TimescaleDB.
 
 You must set the following variables (in your environment or a .env file)
 before you can start using Firestarter.
