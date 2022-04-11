@@ -158,7 +158,7 @@ class TestReconnect(unittest.TestCase):
             b'{"pitr":"1584126630","type":"error","error_msg":"test error"}',
         )
 
-    @patch("main.open_connection", new_callable=AsyncMock)
+    @patch("main.open_connection", new_callable=CoroMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_drift_exceeded(self, mock_kafkaproducer, mock_openconnection):
         self.reconnect_after_error(
@@ -175,7 +175,7 @@ class TestReconnect(unittest.TestCase):
             ]
         )
 
-    @patch("main.open_connection", new_callable=AsyncMock)
+    @patch("main.open_connection", new_callable=CoroMock)
     @patch("main.Producer", new_callable=Mock)
     def test_pitr_drift_reset(self, mock_kafkaproducer, mock_openconnection):
         # does not reconnect and is waiting for the next message
