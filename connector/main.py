@@ -292,6 +292,7 @@ async def main():
                 value="",
             )
         except KafkaException as error:
+            producer = None
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
 
