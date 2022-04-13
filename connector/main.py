@@ -189,7 +189,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
     """
     # pylint: disable=global-statement
     # pylint: disable=too-many-statements
-    global last_good_pitr, lines_read, bytes_read
+    global last_good_pitr, lines_read, bytes_read, producer
 
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -262,11 +262,14 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             print(f"Encountered full outgoing buffer, should resolve itself: {e}")
             time.sleep(1)
         except KafkaException as e:
-            if not e.args[0].retriable():
-                print(f"Kafka exception occurred that cannot be retried: {e}")
+            err = e.args[0]
+            # INVALID_REPLICATION_FACTOR occurs when Kafka broker is in transient state
+            # and the partition count is still 0 so there's no leader. Wait to retry.
+            if err.code != KafkaError.INVALID_REPLICATION_FACTOR and not err.retriable():
+                print(f"Kafka exception occurred that cannot be retried: {err}")
                 raise
             print(
-                f"Encountered retriable kafka error ({e.args[0].str()}), "
+                f"Encountered retriable kafka error ({err}), "
                 "waiting a moment and trying again"
             )
             time.sleep(1)
