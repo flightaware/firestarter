@@ -9,7 +9,7 @@ import time
 import warnings
 import zlib
 from typing import Optional, Tuple
-from confluent_kafka import KafkaException, Producer  # type: ignore
+from confluent_kafka import KafkaException, KafkaError, Producer  # type: ignore
 
 CONNECTION_ERROR_LIMIT = 3
 
@@ -263,6 +263,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             time.sleep(1)
         except KafkaException as e:
             if not e.args[0].retriable():
+                print(f"Kafka exception occurred that cannot be retried: {e}")
                 raise
             print(
                 f"Encountered retriable kafka error ({e.args[0].str()}), "
@@ -285,6 +286,11 @@ async def main():
     while producer is None:
         try:
             producer = Producer({"bootstrap.servers": "kafka:9092", "linger.ms": 500})
+            producer.produce(
+                "test",
+                key="noop",
+                value="",
+            )
         except KafkaException as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)

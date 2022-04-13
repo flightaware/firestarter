@@ -75,7 +75,8 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.produce.assert_not_called()
+            # only call should be the to the test topic that the producer is ready
+            self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 1)
         else:
             # verify expected init cmds
             self.assertEqual(
@@ -87,14 +88,15 @@ class TestReconnect(unittest.TestCase):
             )
             # verify expect output to kafka
             if len(error) == 1:
-                mock_kafkaproducer.return_value.produce.assert_called_once_with(
+                mock_kafkaproducer.return_value.produce.assert_any_call(
                     "topic1",
                     key=b"KPVD-1588929046-hexid-ADF994",
                     value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                     callback=ANY,
                 )
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 2)
             else:
-                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error))
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error)+1)
 
     @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
@@ -203,8 +205,9 @@ class TestCompression(unittest.TestCase):
         return self.fh_reader, self.fh_writer
 
     def save_line_stop_test(self, topic, value=None, key=None, callback=None):
-        self.emitted_msg.append(value)
-        raise EndTestNow()
+        if topic != "test":
+            self.emitted_msg.append(value)
+            raise EndTestNow()
 
     def compression(self, mock_kafkaproducer, mock_openconnection, compression):
         mock_kafkaproducer.return_value.produce.side_effect = self.save_line_stop_test
