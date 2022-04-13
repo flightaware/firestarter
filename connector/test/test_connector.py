@@ -75,7 +75,8 @@ class TestReconnect(unittest.TestCase):
                 ],
             )
             # verify expect output to kafka
-            mock_kafkaproducer.return_value.produce.assert_not_called()
+            # only call should be the to the test topic that the producer is ready
+            self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 1)
         else:
             # verify expected init cmds
             self.assertEqual(
@@ -95,7 +96,7 @@ class TestReconnect(unittest.TestCase):
                 )
                 self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 2)
             else:
-                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error))
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error)+1)
 
     @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
