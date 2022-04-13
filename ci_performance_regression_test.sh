@@ -19,11 +19,13 @@ echo "Positions Count: ${positions_count}"
 
 if [[ $flights_count -lt 45000 ]]; then
 	echo "Flight count lower than threshold 45000"
+	docker-compose logs
 	exit 1
 fi
 
 if [[ $positions_count -lt 200000 ]]; then
 	echo "Position count lower than threshold 200000"
+	docker-compose logs
 	exit 1
 fi
 

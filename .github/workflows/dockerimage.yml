@@ -81,4 +81,3 @@ jobs:
         run: |
           docker-compose up -d
           ./ci_performance_regression_test.sh
-          docker-compose logs
