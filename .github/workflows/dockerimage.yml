@@ -24,6 +24,10 @@ jobs:
         node-version: [12.16.3]
         python-version: [3.9]
     steps:
+      - name: Add secrets mask
+        run: |
+          echo "::add-mask::${{ secrets.FH_USERNAME }}"
+          echo "::add-mask::${{ secrets.FH_APIKEY }}"
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
@@ -77,4 +81,4 @@ jobs:
         run: |
           docker-compose up -d
           ./ci_performance_regression_test.sh
-          
+          docker-compose logs
