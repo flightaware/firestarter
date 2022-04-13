@@ -9,7 +9,7 @@ import time
 import warnings
 import zlib
 from typing import Optional, Tuple
-from confluent_kafka import KafkaException, Producer  # type: ignore
+from confluent_kafka import KafkaException, KafkaError, Producer  # type: ignore
 
 CONNECTION_ERROR_LIMIT = 3
 
@@ -286,6 +286,11 @@ async def main():
     while producer is None:
         try:
             producer = Producer({"bootstrap.servers": "kafka:9092", "linger.ms": 500})
+            producer.produce(
+                "test",
+                key="noop",
+                value="",
+            )
         except KafkaException as error:
             print(f"Kafka isn't available ({error}), trying again in a few seconds")
             time.sleep(3)
