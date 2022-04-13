@@ -263,6 +263,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
             time.sleep(1)
         except KafkaException as e:
             if not e.args[0].retriable():
+                print(f"Kafka exception occurred that cannot be retried: {e}")
                 raise
             print(
                 f"Encountered retriable kafka error ({e.args[0].str()}), "
