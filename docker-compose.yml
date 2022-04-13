@@ -144,8 +144,6 @@ services:
       options:
         max-size: "10mb"
         max-file: "5"
-    depends_on:
-      - timescaledb
 
   fids-frontend:
     image: "ghcr.io/flightaware/fids_frontend/fids-frontend:${FIDS_VERSION:-latest}"
