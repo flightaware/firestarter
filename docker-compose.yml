@@ -25,31 +25,31 @@ services:
       # OPTIONAL environment variables
       # Firehose URL, defaults to firehose-test.flightaware.com.
       # firehose.flightaware.com can also be used
-      # - SERVER=${SERVER:-}
+      - SERVER
       # Streaming compression of incoming Firehose data. Valid values are gzip,
       # deflate, or compress. Leave blank to disable compression.
-      # - COMPRESSION=${COMPRESSION:-}
+      - COMPRESSION
       # Frequency in seconds to print stats about connection (messages/bytes
       # per second). Set to 0 to disable.
-      # - PRINT_STATS_PERIOD=${PRINT_STATS_PERIOD:-}
+      - PRINT_STATS_PERIOD
       # Frequency in seconds that Firehose should send a synthetic "keepalive"
       # message to help connector ensure the connection is still alive. If no
       # such message is received within roughly $keepalive seconds, connector
       # will automatically reconnect to Firehose.
-      # - KEEPALIVE=${KEEPALIVE:-}
+      - KEEPALIVE
       # The number of times that the same pitr seen in consecutive keeplive
       # messages should trigger an error and a restart of the connection
-      # - KEEPALIVE_STALE_PITRS=${KEEPALIVE_STALE_PITRS:-}
+      - KEEPALIVE_STALE_PITRS
       # "Time mode" of Firehose init command. Can be "live" or "pitr <pitr>";
       # range is currently not supported.
       # See https://flightaware.com/commercial/firehose/documentation/commands
       # for more details.
-      # - INIT_CMD_TIME=${INIT_CMD_TIME:-}
+      - INIT_CMD_TIME
       # The "optional" section of the Firehose init command. Mostly consists of
       # filters for the data. Do not put username, password, keepalive, or
       # compression commands here. Documentation at
       # https://flightaware.com/commercial/firehose/documentation/commands
-      # - INIT_CMD_ARGS=${INIT_CMD_ARGS:-}
+      - INIT_CMD_ARGS
 
       # PYTHON settings
       - PYTHONUNBUFFERED=1
