@@ -205,8 +205,9 @@ class TestCompression(unittest.TestCase):
         return self.fh_reader, self.fh_writer
 
     def save_line_stop_test(self, topic, value=None, key=None, callback=None):
-        self.emitted_msg.append(value)
-        raise EndTestNow()
+        if topic != "test":
+            self.emitted_msg.append(value)
+            raise EndTestNow()
 
     def compression(self, mock_kafkaproducer, mock_openconnection, compression):
         mock_kafkaproducer.return_value.produce.side_effect = self.save_line_stop_test
