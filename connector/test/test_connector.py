@@ -87,12 +87,13 @@ class TestReconnect(unittest.TestCase):
             )
             # verify expect output to kafka
             if len(error) == 1:
-                mock_kafkaproducer.return_value.produce.assert_called_once_with(
+                mock_kafkaproducer.return_value.produce.assert_any_call(
                     "topic1",
                     key=b"KPVD-1588929046-hexid-ADF994",
                     value=b'{"pitr":"1584126630","type":"arrival","id":"KPVD-1588929046-hexid-ADF994"}',
                     callback=ANY,
                 )
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 2)
             else:
                 self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error))
 
