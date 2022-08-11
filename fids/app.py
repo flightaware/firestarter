@@ -68,7 +68,7 @@ def _get_positions(flight_id: str) -> Iterable:
 
 @app.route("/ground_positions/<flight_id>")
 def get_ground_positions(flight_id: str) -> Response:
-    """Get positions for a specific flight_id"""
+    """Get ground positions for a specific flight_id"""
     result = _get_ground_positions(flight_id)
     if not result:
         abort(404)
