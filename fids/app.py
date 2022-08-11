@@ -72,7 +72,6 @@ def get_ground_positions(flight_id: str) -> Response:
     result = _get_ground_positions(flight_id)
     if not result:
         abort(404)
-    # print("HEY HERE IS THE GROUND_POSITION DATA" + str([dict(e) for e in result]))
     return jsonify([dict(e) for e in result])
 
 
