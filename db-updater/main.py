@@ -542,7 +542,6 @@ def main():
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
         "position": process_position_message,
-        # maybe change here
         "ground_position": process_ground_position_message,
     }
 
