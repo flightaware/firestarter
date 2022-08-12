@@ -51,7 +51,7 @@ UTC = timezone.utc
 def _get_ground_positions(flight_id: str) -> Iterable:
     return (
         positions_engine.execute(
-            positions.select().where(and_(positions.c.id == flight_id, positions.c.air_ground is not None)).order_by(positions.c.time.desc())
+            positions.select().where(and_(positions.c.id == flight_id, positions.c.air_ground == "G")).order_by(positions.c.time.desc())
         )
         or []
     )
@@ -255,33 +255,42 @@ def airport_scheduled(airport: str) -> Response:
 def get_map(flight_id: str) -> bytes:
     """Get a static map image of the specified flight. Returned as a
     base64-encoded image"""
+    def get_first_4_coords(a1, a2, b1, b2):
+        """
+        Small function to get 4 earliest coordinates by time and return top 2
+        earliest coordinates (for bearing)
+        """
+        holder = sorted([a1, a2, b1, b2], reverse=True, key=lambda x: x.time)
+        return holder[:2]
     positions = list(_get_positions(flight_id))
     if not positions:
         abort(404)
-    bearing = 0
-    if len(positions) > 1:
-        coord1 = (float(positions[1].latitude), float(positions[1].longitude))
-        coord2 = (float(positions[0].latitude), float(positions[0].longitude))
-        bearing = trig.get_cardinal_for_angle(trig.get_bearing_degrees(coord1, coord2))
-    coords = "|".join(f"{pos.latitude},{pos.longitude}" for pos in positions)
 
     # Do ground positions
     ground_positions = list(_get_ground_positions(flight_id))
+    do_gp = True
     if not ground_positions:
-        abort(404)
-    bearing_gp = 0
-    if len(ground_positions) > 1:
-        coord1 = (float(ground_positions[1].latitude), float(ground_positions[1].longitude))
-        coord2 = (float(ground_positions[0].latitude), float(ground_positions[0].longitude))
-        bearing_gp = trig.get_cardinal_for_angle(trig.get_bearing_degrees(coord1, coord2))
-    coords_gp = "|".join(f"{pos.latitude},{pos.longitude}" for pos in ground_positions)
+        do_gp = False
+    bearing = 0
+    if len(positions) > 1:
+        if do_gp:
+            result = get_first_4_coords(positions[0], positions[1], ground_positions[0], ground_positions[1])
+            coord1 = (float(result[1].latitude), float(result[1].longitude))
+            coord2 = (float(result[0].latitude), float(result[0].longitude))
+        else:
+            coord1 = (float(positions[1].latitude), float(positions[1].longitude))
+            coord2 = (float(positions[0].latitude), float(positions[0].longitude))
+        bearing = trig.get_cardinal_for_angle(trig.get_bearing_degrees(coord1, coord2))
+    coords = "|".join(f"{pos.latitude},{pos.longitude}" for pos in positions)
+
+
+    coords_gp = list(_get_ground_positions(flight_id))
 
     google_maps_url = "https://maps.googleapis.com/maps/api/staticmap"
     google_maps_params = {
         "size": "640x400",
         "markers": [
             f"anchor:center|icon:https://github.com/flightaware/fids_frontend/raw/master/images/aircraft_{bearing}.png|{positions[0].latitude},{positions[0].longitude}",
-            f"anchor:center|icon:https://github.com/flightaware/fids_frontend/raw/master/images/aircraft_{bearing_gp}.png|{ground_positions[0].latitude},{ground_positions[0].longitude}"
         ],
         "path": [
             f"color:0x0000ff|weight:5|{coords}",
