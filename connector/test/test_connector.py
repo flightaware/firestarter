@@ -96,7 +96,7 @@ class TestReconnect(unittest.TestCase):
                 )
                 self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, 2)
             else:
-                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error)+1)
+                self.assertEqual(mock_kafkaproducer.return_value.produce.call_count, len(error) + 1)
 
     @patch("main.open_connection", new_callable=AsyncMock)
     @patch("main.Producer", new_callable=Mock)
@@ -166,7 +166,7 @@ class TestReconnect(unittest.TestCase):
                 b'{"pitr":"1584126630","type":"keepalive"}',
                 b'{"pitr":"1584126630","type":"keepalive"}',
                 b'{"pitr":"1584126630","type":"keepalive"}',
-            ]
+            ],
         )
 
     @patch("main.open_connection", new_callable=AsyncMock)
@@ -185,7 +185,7 @@ class TestReconnect(unittest.TestCase):
                     b'{"pitr":"1584126630","type":"keepalive"}',
                     b'{"pitr":"1584126630","type":"keepalive"}',
                     b'{"pitr":"1584126631","type":"keepalive"}',
-                ]
+                ],
             )
 
 

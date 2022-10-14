@@ -124,15 +124,16 @@ def parse_script_args() -> None:
                 "It belongs in its own variable."
             )
 
+
 def get_last_pitr_produced() -> Optional[int]:
     """See what the last PITR produced was to use for resuming from Firehose"""
-    timeout = 3
+    timeout = float(os.environ.get("RESUME_FROM_LAST_PITR_TIMEOUT", "3"))
     try:
         consumer = Consumer(
             {
                 "bootstrap.servers": "kafka:9092",
                 "enable.auto.commit": False,
-                "group.id": "firestarter-connector"
+                "group.id": "firestarter-connector-pitr-resumption",
             }
         )
 
@@ -144,11 +145,13 @@ def get_last_pitr_produced() -> Optional[int]:
             return
 
         pitr = None
-        print(f"Looking at {len(topic_metadata.partitions)} partition(s) in {topic_of_interest}")
+        print(
+            f"Looking for resumption PITR in {len(topic_metadata.partitions)} partition(s) in {topic_of_interest}"
+        )
         for partition_id in topic_metadata.partitions:
             topic_partition = TopicPartition(topic_of_interest, partition_id)
             watermarks = consumer.get_watermark_offsets(topic_partition, timeout)
-            
+
             if watermarks is None:
                 continue
 
@@ -171,6 +174,7 @@ def get_last_pitr_produced() -> Optional[int]:
 
     except (KafkaException, KafkaError, OSError) as error:
         print(f"Could not get resumption PITR: {error}")
+
 
 async def event_wait(event: asyncio.Event, timeout: int) -> bool:
     """Wait for event with timeout, return True if event was set, False if we timed out
@@ -321,8 +325,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 print(f"Kafka exception occurred that cannot be retried: {err}")
                 raise
             print(
-                f"Encountered retriable kafka error ({err}), "
-                "waiting a moment and trying again"
+                f"Encountered retriable kafka error ({err}), " "waiting a moment and trying again"
             )
             time.sleep(1)
         producer.poll(0)

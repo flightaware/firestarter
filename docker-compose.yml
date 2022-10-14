@@ -50,6 +50,9 @@ services:
       # look at the last record in each partition and use the largest PITR seen
       # in the initiation command. Defaults to "false".
       - RESUME_FROM_LAST_PITR
+      # Timeout in seconds to use when resuming from last pitr. Defaults to 3 seconds
+      # but can be any float value.
+      - RESUME_FROM_LAST_PITR_TIMEOUT
       # The "optional" section of the Firehose init command. Mostly consists of
       # filters for the data. Do not put username, password, keepalive, or
       # compression commands here. Documentation at
