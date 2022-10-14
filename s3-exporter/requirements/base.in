@@ -1,4 +1,3 @@
 attrs
-aiobotocore
-types-aiobotocore[s3]
 aiokafka
+boto3

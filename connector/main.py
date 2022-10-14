@@ -9,7 +9,7 @@ import time
 import warnings
 import zlib
 from typing import Optional, Tuple
-from confluent_kafka import KafkaException, KafkaError, Producer  # type: ignore
+from confluent_kafka import Consumer, KafkaException, KafkaError, Producer, TopicPartition  # type: ignore
 
 CONNECTION_ERROR_LIMIT = 3
 
@@ -109,6 +109,11 @@ def parse_script_args() -> None:
     KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
     KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
+    if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
+        resumption_pitr = get_last_pitr_produced()
+        if resumption_pitr:
+            INIT_CMD_TIME = f"pitr {resumption_pitr}"
+            print(f"Resuming Firehose reading from PITR {resumption_pitr}")
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
     INIT_CMD_ARGS = os.environ.get("INIT_CMD_ARGS", "")
@@ -119,6 +124,53 @@ def parse_script_args() -> None:
                 "It belongs in its own variable."
             )
 
+def get_last_pitr_produced() -> Optional[int]:
+    """See what the last PITR produced was to use for resuming from Firehose"""
+    timeout = 3
+    try:
+        consumer = Consumer(
+            {
+                "bootstrap.servers": "kafka:9092",
+                "enable.auto.commit": False,
+                "group.id": "firestarter-connector"
+            }
+        )
+
+        topic_of_interest = os.environ["KAFKA_TOPIC_NAME"]
+        cluster_metadata = consumer.list_topics()
+        topic_metadata = cluster_metadata.topics.get(topic_of_interest)
+        if not topic_metadata:
+            print(f"No data found for topic {topic_of_interest}")
+            return
+
+        pitr = None
+        print(f"Looking at {len(topic_metadata.partitions)} partition(s) in {topic_of_interest}")
+        for partition_id in topic_metadata.partitions:
+            topic_partition = TopicPartition(topic_of_interest, partition_id)
+            watermarks = consumer.get_watermark_offsets(topic_partition, timeout)
+            
+            if watermarks is None:
+                continue
+
+            low, high = watermarks
+            # Means there aren't any records in the partition
+            if low >= high - 1:
+                continue
+
+            consumer.assign([TopicPartition(topic_of_interest, partition_id, high - 1)])
+            last_record = consumer.poll(timeout)
+            if last_record is None:
+                continue
+
+            last_record_payload = json.loads(last_record.value())
+            last_record_pitr = last_record_payload["pitr"]
+
+            pitr = last_record_pitr if pitr is None else max(pitr, last_record_pitr)
+
+        return pitr
+
+    except (KafkaException, KafkaError, OSError) as error:
+        print(f"Could not get resumption PITR: {error}")
 
 async def event_wait(event: asyncio.Event, timeout: int) -> bool:
     """Wait for event with timeout, return True if event was set, False if we timed out

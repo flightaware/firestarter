@@ -45,6 +45,11 @@ services:
       # See https://flightaware.com/commercial/firehose/documentation/commands
       # for more details.
       - INIT_CMD_TIME
+      # Whether to resume from the last PITR committed. If set to "true", then
+      # rather than consuming from what is specified in INIT_CMD_TIME, we first
+      # look at the last record in each partition and use the largest PITR seen
+      # in the initiation command. Defaults to "false".
+      - RESUME_FROM_LAST_PITR
       # The "optional" section of the Firehose init command. Mostly consists of
       # filters for the data. Do not put username, password, keepalive, or
       # compression commands here. Documentation at
@@ -91,21 +96,22 @@ services:
     depends_on:
       - kafka
 
-  s3-exporter:
-    image: "ghcr.io/flightaware/firestarter/firestarter_s3-exporter:${FS_VERSION:-latest}"
-    build:
-      context: .
-      dockerfile: s3-exporter/Dockerfile
-    init: true
-    networks:
-      - internal
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "8mb"
-        max-file: "3"
-    depends_on:
-      - kafka
+#  s3-exporter:
+#    image: "ghcr.io/flightaware/firestarter/firestarter_s3-exporter:${FS_VERSION:-latest}"
+#    build:
+#      context: .
+#      dockerfile: s3-exporter/Dockerfile
+#    env_file: ./.env-s3-exporter
+#    init: true
+#    networks:
+#      - internal
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "8mb"
+#        max-file: "3"
+#    depends_on:
+#      - kafka
 
   zookeeper:
     image: "bitnami/zookeeper:3.6.2"

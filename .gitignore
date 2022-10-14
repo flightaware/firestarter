@@ -1,5 +1,6 @@
 __pycache__/
 .env
+.env-s3-exporter
 venv/
 .python-version
 .mypy_cache/

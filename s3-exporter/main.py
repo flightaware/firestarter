@@ -4,17 +4,16 @@
 import argparse as ap
 import asyncio
 import bz2
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 import os
 from pathlib import Path
 from signal import Signals, SIGINT, SIGTERM
 import sys
-from typing import Any, Optional
 
-from aiobotocore.session import get_session
 from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 import attr
-from types_aiobotocore_s3.client import S3Client
+import boto3
 
 
 def parse_args():
@@ -24,19 +23,6 @@ def parse_args():
 
     parser.add_argument(
         "--s3-bucket", default=os.getenv("S3_BUCKET", ""), help="S3 bucket to write files into"
-    )
-    parser.add_argument(
-        "--aws-secret-access-key",
-        default=os.getenv("AWS_SECRET_ACCESS_KEY", ""),
-        help="AWS secret access key",
-    )
-    parser.add_argument(
-        "--aws-access-key-id", default=os.getenv("AWS_ACCESS_KEY_ID", ""), help="AWS access key ID"
-    )
-    parser.add_argument(
-        "--aws-region-name",
-        default=os.getenv("AWS_REGION_NAME", "us-east-1"),
-        help="AWS region with the S3 bucket",
     )
     parser.add_argument(
         "--kafka-brokers",
@@ -50,7 +36,7 @@ def parse_args():
     )
     parser.add_argument(
         "--records-per-file",
-        default=int(os.getenv("RECORDS_PER_FILE", "1000")),
+        default=int(os.getenv("RECORDS_PER_FILE", "10000")),
         help="Threshold number of records in a file before writing to S3",
     )
     parser.add_argument(
@@ -107,6 +93,8 @@ async def consume_records_from_kafka(
             #  connector
             topic_partition = TopicPartition(msg.topic, msg.partition)
             await consumer.commit({topic_partition: offset + 1})
+
+            offsets_queue.task_done()
 
     finally:
         await consumer.stop()
@@ -199,26 +187,30 @@ async def write_files_to_s3(
     """Reads file contenst from the s3_queue and writes them to the s3 bucket
     specified in args. When successful, sends an offset update to the Kafka
     consumer via the kafka_offset_queue"""
-    session = get_session()
-    async with session.create_client(
-        "s3",
-        aws_secret_access_key=args.aws_secret_access_key,
-        aws_access_key_id=args.aws_access_key_id,
-        region_name=args.aws_region_name,
-    ) as client:
-        client: S3Client
+    executor = ThreadPoolExecutor()
+    loop = asyncio.get_running_loop()
 
-        while True:
-            s3_write_object: S3WriteObject = await s3_queue.get()
+    # Using the standard configuration options, e.g., 3 retries
+    # Gets all configuration options from environment variables
+    s3_client = boto3.client("s3")
 
-            # Write to S3
-            await client.put_object(
-                Bucket=args.s3_bucket, Key=s3_write_object.key, Body=s3_write_object.body
-            )
+    while True:
+        s3_write_object: S3WriteObject = await s3_queue.get()
 
-            # Once we've put the object into S3 we can save the last offset we
-            # read from Kafka
-            await kafka_offset_queue.put(s3_write_object.last_offset)
+        # Write to S3 using the ThreadPoolExecutor since boto3 isn't async
+        partial_s3_put = partial(
+            s3_client.put_object,
+            Bucket=args.s3_bucket,
+            Key=s3_write_object.key,
+            Body=s3_write_object.body,
+        )
+        await loop.run_in_executor(executor, partial_s3_put)
+
+        s3_queue.task_done()
+
+        # Once we've put the object into S3 we can save the last offset we
+        # read from Kafka
+        await kafka_offset_queue.put(s3_write_object.last_offset)
 
 
 if __name__ == "__main__":
