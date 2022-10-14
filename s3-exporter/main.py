@@ -252,7 +252,11 @@ async def write_files_to_s3(
 
     # Using the standard configuration options, e.g., 3 retries
     # Gets all configuration options from environment variables
-    s3_client = boto3.client("s3")
+    # We create a separate session for each coroutine since it'll
+    # be running behind the scenes in a threadpool and this is the
+    # recommended way of having thread safety with boto3
+    session = boto3.session.Session()
+    s3_client = session.resource("s3")
 
     while True:
         s3_write_object: S3WriteObject = await s3_queue.get()
@@ -338,8 +342,10 @@ if __name__ == "__main__":
         f"Exporting Kafka records from topic {ARGS.kafka_topic} to S3 bucket "
         f"{ARGS.s3_bucket} from {ARGS.kafka_brokers}"
     )
-    print(f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records "
-          f"and will be compressed with {ARGS.compression_type}")
+    print(
+        f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records "
+        f"and will be compressed with {ARGS.compression_type}"
+    )
 
     LOOP = asyncio.get_event_loop()
 
