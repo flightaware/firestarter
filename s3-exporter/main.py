@@ -9,6 +9,7 @@ from functools import partial
 import os
 from signal import Signals, SIGINT, SIGTERM
 import sys
+from typing import List
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from aiokafka.errors import KafkaConnectionError
@@ -17,7 +18,7 @@ import boto3
 from codetiming import Timer
 
 
-def parse_args():
+def parse_args() -> ap.Namespace:
     """Parse command-line arguments, using environment variables to override
     defaults"""
     parser = ap.ArgumentParser(formatter_class=ap.ArgumentDefaultsHelpFormatter)
@@ -70,7 +71,7 @@ def signal_exit(signal: Signals) -> None:
     sys.exit()
 
 
-async def partitions_for_topic(bootstrap_servers: str, topic: str) -> [int]:
+async def partitions_for_topic(bootstrap_servers: str, topic: str) -> List[int]:
     """Get a list of all the partitions for the topic specified in args"""
     while True:
         try:
@@ -141,7 +142,6 @@ class S3WriteObject:
     key: str = attr.ib()
     body: bytes = attr.ib()
     last_offset: int = attr.ib()
-    partition: int = attr.ib()
 
 
 # pylint: disable=too-many-instance-attributes
@@ -204,7 +204,6 @@ class S3FileBatcher:
             key=filename,
             body=file_contents,
             last_offset=self._last_offset_in_batch,
-            partition=self.kafka_partition,
         )
 
         await self.s3_writer_queue.put(s3_object)
@@ -241,12 +240,14 @@ async def build_batch_of_records_from_kafka(
 
 
 async def write_files_to_s3(
-    args: ap.Namespace, s3_queue: asyncio.Queue, kafka_offset_queues: [asyncio.Queue]
+    args: ap.Namespace,
+    executor: ThreadPoolExecutor,
+    s3_queue: asyncio.Queue,
+    kafka_offset_queue: asyncio.Queue,
 ):
     """Reads file contenst from the s3_queue and writes them to the s3 bucket
     specified in args. When successful, sends an offset update to the Kafka
     consumer via the kafka_offset_queue"""
-    executor = ThreadPoolExecutor()
     loop = asyncio.get_running_loop()
 
     # Using the standard configuration options, e.g., 3 retries
@@ -279,8 +280,7 @@ async def write_files_to_s3(
 
         # Once we've put the object into S3 we can save the last offset we
         # read from Kafka
-        partition = s3_write_object.partition
-        await kafka_offset_queues[partition].put(s3_write_object.last_offset)
+        await kafka_offset_queue.put(s3_write_object.last_offset)
 
 
 async def main(args: ap.Namespace):
@@ -293,11 +293,21 @@ async def main(args: ap.Namespace):
     )
 
     max_queue_size = args.asyncio_queue_max_size
-    kafka_records_queues = [asyncio.Queue(max_queue_size) for _ in range(len(partitions))]
-    kafka_offsets_queues = [asyncio.Queue(max_queue_size) for _ in range(len(partitions))]
-    s3_writer_queue = asyncio.Queue(max_queue_size)
 
-    tasks = []
+    kafka_records_queues: List[asyncio.Queue] = [
+        asyncio.Queue(max_queue_size) for _ in range(len(partitions))
+    ]
+    kafka_offsets_queues: List[asyncio.Queue] = [
+        asyncio.Queue(max_queue_size) for _ in range(len(partitions))
+    ]
+    s3_writer_queues: List[asyncio.Queue] = [
+        asyncio.Queue(max_queue_size) for _ in range(len(partitions))
+    ]
+
+    # Need this to run boto3 operations
+    executor = ThreadPoolExecutor()
+
+    tasks: List[asyncio.Task] = []
     for partition in partitions:
         # Each partition gets its own Kafka consumer
         consumer_coro = consume_records_from_kafka(
@@ -307,14 +317,17 @@ async def main(args: ap.Namespace):
 
         # Each partition gets its own S3 file batcher
         batcher_coro = build_batch_of_records_from_kafka(
-            args, partition, kafka_records_queues[partition], s3_writer_queue
+            args, partition, kafka_records_queues[partition], s3_writer_queues[partition]
         )
         tasks.append(asyncio.create_task(batcher_coro))
 
-    # All partitions share a single S3 writer
-    s3_writer_coro = write_files_to_s3(args, s3_writer_queue, kafka_offsets_queues)
-    tasks.append(asyncio.create_task(s3_writer_coro))
+        # Each partition gets its own S3 file writer
+        s3_writer_coro = write_files_to_s3(
+            args, executor, s3_writer_queues[partition], kafka_offsets_queues[partition]
+        )
+        tasks.append(asyncio.create_task(s3_writer_coro))
 
+    # Run all the tasks in the event loop
     await asyncio.gather(*tasks, return_exceptions=False)
 
 
@@ -325,7 +338,8 @@ if __name__ == "__main__":
         f"Exporting Kafka records from topic {ARGS.kafka_topic} to S3 bucket "
         f"{ARGS.s3_bucket} from {ARGS.kafka_brokers}"
     )
-    print(f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records")
+    print(f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records "
+          f"and will be compressed with {ARGS.compression_type}")
 
     LOOP = asyncio.get_event_loop()
 
