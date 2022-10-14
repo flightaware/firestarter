@@ -11,6 +11,7 @@ from signal import Signals, SIGINT, SIGTERM
 import sys
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
+from aiokafka.errors import KafkaConnectionError
 import attr
 import boto3
 from codetiming import Timer
@@ -71,18 +72,22 @@ def signal_exit(signal: Signals) -> None:
 
 async def partitions_for_topic(bootstrap_servers: str, topic: str) -> [int]:
     """Get a list of all the partitions for the topic specified in args"""
-    consumer = AIOKafkaConsumer(
-        topic,
-        bootstrap_servers=bootstrap_servers,
-        enable_auto_commit=False,
-    )
+    while True:
+        try:
+            consumer = AIOKafkaConsumer(
+                topic,
+                bootstrap_servers=bootstrap_servers,
+                enable_auto_commit=False,
+            )
+            await consumer.start()
 
-    try:
-        await consumer.start()
-        partitions = consumer.partitions_for_topic(topic)
-        return sorted(partitions)
-    finally:
-        await consumer.stop()
+            partitions = consumer.partitions_for_topic(topic)
+            return sorted(partitions)
+        except KafkaConnectionError:
+            print("Kafka not yet available: trying again in a few seconds")
+            await asyncio.sleep(3)
+        finally:
+            await consumer.stop()
 
 
 async def consume_records_from_kafka(
