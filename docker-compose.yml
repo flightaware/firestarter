@@ -105,9 +105,14 @@ services:
       context: .
       dockerfile: s3-exporter/Dockerfile
     env_file: ./.env-s3-exporter
+    environment:
+      # PYTHON settings for logging purposes
+      - PYTHONUNBUFFERED=1
     init: true
     networks:
       - internal
+    volumes:
+      - ~/.aws:/home/firestarter/.aws:ro
     logging:
       driver: "json-file"
       options:

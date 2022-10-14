@@ -41,13 +41,13 @@ def parse_args():
     )
     parser.add_argument(
         "--records-per-file",
-        default=int(os.getenv("RECORDS_PER_FILE", "10000")),
+        default=int(os.getenv("RECORDS_PER_FILE", "100000")),
         help="Threshold number of records in a file before writing to S3",
     )
     parser.add_argument(
         "--compression-type",
         choices=("none", "bzip"),
-        default=os.getenv("COMPRESSION_TYPE", "none"),
+        default=os.getenv("COMPRESSION_TYPE", "none").lower(),
         help="Compression to use for files uploaded to S3",
     )
 
@@ -103,6 +103,9 @@ async def consume_records_from_kafka(
         topic_partition_assignment = TopicPartition(args.kafka_topic, partition)
         consumer.assign([topic_partition_assignment])
 
+        last_committed = await consumer.committed(topic_partition_assignment)
+        print(f"Consuming partition {partition} at offset {last_committed}")
+
         async for msg in consumer:
             await records_queue.put(msg)
 
@@ -112,9 +115,12 @@ async def consume_records_from_kafka(
                 continue
 
             # Save the offset + 1 as per the Kafka docs
-            topic_partition = TopicPartition(args.kafka_topic, partition)
-            await consumer.commit({topic_partition: offset + 1})
+            offset += 1
 
+            topic_partition = TopicPartition(args.kafka_topic, partition)
+            await consumer.commit({topic_partition: offset})
+
+            print(f"Committed offset {offset} for partition {partition}")
             offsets_queue.task_done()
 
     finally:
@@ -152,6 +158,17 @@ class S3FileBatcher:
     _current_batch: list = attr.ib(init=False, factory=list)
     _starting_offset: int = attr.ib(init=False)
     _last_offset_in_batch: int = attr.ib(init=False)
+    _timer: Timer = attr.ib(
+        init=False,
+        default=attr.Factory(
+            lambda self: Timer(
+                name=f"s3_batcher_{self.kafka_partition}",
+                text=f"{{name}}: Built a batch of {self.records_per_file} "
+                f"Kafka records in {{seconds:.2f}} s",
+            ),
+            takes_self=True,
+        ),
+    )
 
     async def ingest_record(self, record: ConsumerRecord):
         """Ingest a record from Kafka, adding it to the current batch and
@@ -159,6 +176,7 @@ class S3FileBatcher:
         """
         if not self._current_batch:
             self._starting_offset = record.offset
+            self._timer.start()
 
         self._current_batch.append(record.value)
 
@@ -167,6 +185,7 @@ class S3FileBatcher:
 
             await self.enqueue_batch_contents()
             self._current_batch = []
+            self._timer.stop()
 
     async def enqueue_batch_contents(self):
         """Write the current batch of records to the S3 writer's queue"""
@@ -229,11 +248,15 @@ async def write_files_to_s3(
     # Gets all configuration options from environment variables
     s3_client = boto3.client("s3")
 
-    # Get some timing stats on how long it takes to write to S3
-    timer = Timer(name="s3_writer", text="{name}: {minutes:.1f} minutes")
-
     while True:
         s3_write_object: S3WriteObject = await s3_queue.get()
+
+        # Get some timing stats on how long it takes to write to S3
+        timer = Timer(
+            text=f"Successfully wrote {s3_write_object.key} to S3 "
+            f"with {args.records_per_file:,} Kafka records in "
+            f"{{seconds:.2f}} ms",
+        )
 
         # Write to S3 using the ThreadPoolExecutor since boto3 isn't async
         print(f"Attempting to write {s3_write_object.key} to S3...")
@@ -248,8 +271,6 @@ async def write_files_to_s3(
 
         s3_queue.task_done()
         timer.stop()
-
-        print(f"Successfully wrote {s3_write_object.key} to S3...")
 
         # Once we've put the object into S3 we can save the last offset we
         # read from Kafka
