@@ -26,7 +26,7 @@ def log_levels() -> Tuple[str, ...]:
 
 def setup_logging(args: ap.Namespace) -> None:
     """Setup logging format and level"""
-    log_format = "%(levelname)8s: (%(funcName)s) %(message)s"
+    log_format = "%(asctime)s %(levelname)8s: (%(funcName)s) %(message)s"
 
     logging.basicConfig(
         level=args.log_level,
@@ -193,7 +193,7 @@ class S3FileBatcher:
                 name=f"s3_batcher_{self.kafka_partition}",
                 text=f"{{name}}: Built a batch of {self.records_per_file} "
                 f"Kafka records in {{seconds:.2f}} s",
-                logger=logging.debug,
+                logger=logging.info,
             ),
             takes_self=True,
         ),
@@ -276,11 +276,11 @@ async def write_files_to_s3(
 
     # Using the standard configuration options, e.g., 3 retries
     # Gets all configuration options from environment variables
-    # We create a separate session for each coroutine since it'll
-    # be running behind the scenes in a threadpool and this is the
-    # recommended way of having thread safety with boto3
+    # We create a separate client for each coroutine since it'll
+    # be running behind the scenes in a threadpool and clients are
+    # threadsafe according to the boto3 docs
     session = boto3.session.Session()
-    s3_client = session.resource("s3")
+    s3_client = session.client("s3")
 
     while True:
         s3_write_object: S3WriteObject = await s3_queue.get()
@@ -290,7 +290,7 @@ async def write_files_to_s3(
             text=f"Successfully wrote {s3_write_object.key} to S3 "
             f"with {args.records_per_file:,} Kafka records in "
             f"{{seconds:.2f}} ms",
-            logger=logging.debug,
+            logger=logging.info,
         )
 
         # Write to S3 using the ThreadPoolExecutor since boto3 isn't async
