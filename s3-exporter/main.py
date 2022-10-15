@@ -6,16 +6,33 @@ import asyncio
 import bz2
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+import logging
 import os
 from signal import Signals, SIGINT, SIGTERM
 import sys
-from typing import List
+from typing import List, Tuple
 
 from aiokafka import AIOKafkaConsumer, ConsumerRecord, TopicPartition
 from aiokafka.errors import KafkaConnectionError
 import attr
 import boto3
 from codetiming import Timer
+
+
+def log_levels() -> Tuple[str, ...]:
+    """Tuple of available logging levels"""
+    return ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+def setup_logging(args: ap.Namespace) -> None:
+    """Setup logging format and level"""
+    log_format = "%(levelname)8s: (%(funcName)s) %(message)s"
+
+    logging.basicConfig(
+        level=args.log_level,
+        format=log_format,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 def parse_args() -> ap.Namespace:
@@ -52,6 +69,12 @@ def parse_args() -> ap.Namespace:
         default=os.getenv("COMPRESSION_TYPE", "none").lower(),
         help="Compression to use for files uploaded to S3",
     )
+    parser.add_argument(
+        "--log-level",
+        choices=log_levels(),
+        default=os.getenv("LOG_LEVEL", "INFO").upper(),
+        help="Possible log levels",
+    )
 
     return parser.parse_args()
 
@@ -67,7 +90,7 @@ def setup_signal_handlers(loop: asyncio.events.AbstractEventLoop) -> None:
 
 def signal_exit(signal: Signals) -> None:
     """Log the signal received and exit the program"""
-    print(f"Exiting from a {signal.name}")
+    logging.info(f"Exiting from a {signal.name}")
     sys.exit()
 
 
@@ -85,7 +108,7 @@ async def partitions_for_topic(bootstrap_servers: str, topic: str) -> List[int]:
             partitions = consumer.partitions_for_topic(topic)
             return sorted(partitions)
         except KafkaConnectionError:
-            print("Kafka not yet available: trying again in a few seconds")
+            logging.warning("Kafka not yet available: trying again in a few seconds")
             await asyncio.sleep(3)
         finally:
             await consumer.stop()
@@ -110,7 +133,7 @@ async def consume_records_from_kafka(
         consumer.assign([topic_partition_assignment])
 
         last_committed = await consumer.committed(topic_partition_assignment)
-        print(f"Consuming partition {partition} at offset {last_committed}")
+        logging.info(f"Consuming partition {partition} at offset {last_committed}")
 
         async for msg in consumer:
             await records_queue.put(msg)
@@ -126,7 +149,7 @@ async def consume_records_from_kafka(
             topic_partition = TopicPartition(args.kafka_topic, partition)
             await consumer.commit({topic_partition: offset})
 
-            print(f"Committed offset {offset} for partition {partition}")
+            logging.info(f"Committed offset {offset} for partition {partition}")
             offsets_queue.task_done()
 
     finally:
@@ -170,6 +193,7 @@ class S3FileBatcher:
                 name=f"s3_batcher_{self.kafka_partition}",
                 text=f"{{name}}: Built a batch of {self.records_per_file} "
                 f"Kafka records in {{seconds:.2f}} s",
+                logger=logging.debug,
             ),
             takes_self=True,
         ),
@@ -266,11 +290,13 @@ async def write_files_to_s3(
             text=f"Successfully wrote {s3_write_object.key} to S3 "
             f"with {args.records_per_file:,} Kafka records in "
             f"{{seconds:.2f}} ms",
+            logger=logging.debug,
         )
 
         # Write to S3 using the ThreadPoolExecutor since boto3 isn't async
-        print(f"Attempting to write {s3_write_object.key} to S3...")
+        logging.info(f"Attempting to write {s3_write_object.key} to S3...")
         timer.start()
+
         partial_s3_put = partial(
             s3_client.put_object,
             Bucket=args.s3_bucket,
@@ -291,7 +317,7 @@ async def main(args: ap.Namespace):
     """Setup all the tasks needed to read from Kafka and write to S3"""
     partitions = await partitions_for_topic(args.kafka_brokers, args.kafka_topic)
     num_partitions = len(partitions)
-    print(
+    logging.info(
         f"Creating a Kafka consumer and S3 file builder for "
         f"{num_partitions} partition(s) in topic {args.kafka_topic}"
     )
@@ -338,11 +364,12 @@ async def main(args: ap.Namespace):
 if __name__ == "__main__":
     ARGS = parse_args()
 
-    print(
+    setup_logging(ARGS)
+    logging.info(
         f"Exporting Kafka records from topic {ARGS.kafka_topic} to S3 bucket "
         f"{ARGS.s3_bucket} from {ARGS.kafka_brokers}"
     )
-    print(
+    logging.info(
         f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records "
         f"and will be compressed with {ARGS.compression_type}"
     )
