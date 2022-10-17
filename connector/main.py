@@ -109,7 +109,7 @@ def parse_script_args() -> None:
     STATS_PERIOD = int(os.environ.get("PRINT_STATS_PERIOD", "10"))
     KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
     KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
-    KEEPALIVE_PRODUCE = os.environ.get("KEEPALIVE_PRODUCE", "").lower() == "true"
+    KEEPALIVE_PRODUCE = os.environ.get("KEEPALIVE_PRODUCE", "true").lower() == "true"
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
         if (resumption_pitr := get_last_pitr_produced()) :
@@ -320,8 +320,8 @@ async def read_firehose(time_mode: str) -> Optional[str]:
                 # All we can really do is report it
                 print(f"Error when delivering message: {err}")
 
-        # If it's a keepalive, move on since we don't want these messages in
-        # Kafka
+        # If KEEPALIVE_PRODUCE is false, then we don't bother producing
+        # these messages to Kafka
         if not KEEPALIVE_PRODUCE and message["type"] == "keepalive":
             continue
 

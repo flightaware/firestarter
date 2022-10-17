@@ -53,7 +53,7 @@ services:
       # Timeout in seconds to use when resuming from last pitr. Defaults to 3 seconds
       # but can be any float value.
       - RESUME_FROM_LAST_PITR_TIMEOUT
-      # Whether to produce keepalives to Kafka. Defaults to false. Set to "true" to
+      # Whether to produce keepalives to Kafka. Defaults to true. Set to "false" to
       # avoid producing these messages to Kafka.
       - KEEPALIVE_PRODUCE
       # The "optional" section of the Firehose init command. Mostly consists of
