@@ -21,6 +21,7 @@ INIT_CMD_ARGS: str
 INIT_CMD_TIME: str
 KEEPALIVE: int
 KEEPALIVE_STALE_PITRS: int
+KEEPALIVE_PRODUCE: bool
 SERVERNAME: str
 STATS_PERIOD: int
 
@@ -97,7 +98,7 @@ def parse_script_args() -> None:
     """Sets global variables based on the environment variables provided in docker-compose"""
     # pylint: disable=global-statement
     # pylint: disable=line-too-long
-    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, KEEPALIVE_STALE_PITRS, INIT_CMD_TIME, INIT_CMD_ARGS
+    global USERNAME, APIKEY, SERVERNAME, COMPRESSION, STATS_PERIOD, KEEPALIVE, KEEPALIVE_STALE_PITRS, KEEPALIVE_PRODUCE, INIT_CMD_TIME, INIT_CMD_ARGS
 
     # **** REQUIRED ****
     USERNAME = os.environ["FH_USERNAME"]
@@ -108,6 +109,7 @@ def parse_script_args() -> None:
     STATS_PERIOD = int(os.environ.get("PRINT_STATS_PERIOD", "10"))
     KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
     KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
+    KEEPALIVE_PRODUCE = os.environ.get("KEEPALIVE_PRODUCE", "").lower() == "true"
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
         if (resumption_pitr := get_last_pitr_produced()) :
@@ -122,6 +124,7 @@ def parse_script_args() -> None:
                 f'$INIT_CMD_ARGS should not contain the "{command}" command. '
                 "It belongs in its own variable."
             )
+
 
 def get_last_pitr_produced() -> Optional[int]:
     """See what the last PITR produced was to use for resuming from Firehose"""
@@ -319,7 +322,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
 
         # If it's a keepalive, move on since we don't want these messages in
         # Kafka
-        if message["type"] == "keepalive":
+        if not KEEPALIVE_PRODUCE and message["type"] == "keepalive":
             continue
 
         # FIXME: This makes keepalives a bit useless if they won't be showing
