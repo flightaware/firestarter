@@ -17,6 +17,7 @@ from aiokafka.errors import KafkaConnectionError
 import attr
 import boto3
 from codetiming import Timer
+from humanfriendly import parse_size
 
 
 def log_levels() -> Tuple[str, ...]:
@@ -60,8 +61,13 @@ def parse_args() -> ap.Namespace:
     )
     parser.add_argument(
         "--records-per-file",
-        default=int(os.getenv("RECORDS_PER_FILE", "100000")),
+        default=int(os.getenv("RECORDS_PER_FILE", "15000")),
         help="Threshold number of records in a file before writing to S3",
+    )
+    parser.add_argument(
+        "--bytes-per-file",
+        default=parse_size(os.getenv("BYTES_PER_FILE", "10MB"), binary=True),
+        help="Threshold number of uncompressed bytes in a file before writing to S3",
     )
     parser.add_argument(
         "--compression-type",
@@ -175,16 +181,19 @@ class S3FileBatcher:
     single partition in the given Kafka topic.
 
     The consumer of the queue then writes these batches to S3.
+
+    A batch is written to the `s3_writer_queue` if a threshold number of Kafka
+    records has been reached or a threshold number of bytes has been reached or
+    exceeded in the current batch's uncompressed format.
     """
 
-    kafka_topic: str = attr.ib()
+    args: ap.Namespace = attr.ib()
     kafka_partition: int = attr.ib()
-    records_per_file: int = attr.ib()
-    compression_type: str = attr.ib()
     s3_writer_queue: asyncio.Queue = attr.ib()
 
     _current_batch: list = attr.ib(init=False, factory=list)
-    _starting_offset: int = attr.ib(init=False)
+    _current_batch_bytes: int = attr.ib(init=False, factory=int)
+    _starting_offset: int = attr.ib(init=False, factory=int)
     _last_offset_in_batch: int = attr.ib(init=False)
     _timer: Timer = attr.ib(
         init=False,
@@ -199,22 +208,57 @@ class S3FileBatcher:
         ),
     )
 
+    @property
+    def kafka_topic(self) -> str:
+        """Kafka topic whose records are building up a batch"""
+        return self.args.kafka_topic
+
+    @property
+    def records_per_file(self) -> int:
+        """Max number of Kafka records that make up an S3 file"""
+        return self.args.records_per_file
+
+    @property
+    def bytes_per_file(self) -> int:
+        """Max number of bytes that make up an S3 file"""
+        return self.args.bytes_per_file
+
+    @property
+    def compression_type(self) -> str:
+        """Compression type to use (if any) for the S3 files"""
+        return self.args.compression_type
+
     async def ingest_record(self, record: ConsumerRecord):
         """Ingest a record from Kafka, adding it to the current batch and
-        writing a file to disk if necessary
+        writing a file to the S3 writer queue if necessary
         """
         if not self._current_batch:
             self._starting_offset = record.offset
             self._timer.start()
 
+        # Even though we might exceed the max bytes, that's okay since it's
+        # only a rough threshold that we strive to maintain here and the number
+        # of records is more strictly adhered to
         self._current_batch.append(record.value)
+        self._current_batch_bytes += len(record.value)
 
-        if len(self._current_batch) >= self.records_per_file:
+        if self.write_batch_to_file():
             self._last_offset_in_batch = record.offset
-
             await self.enqueue_batch_contents()
+
             self._current_batch = []
+            self._current_batch_bytes = 0
             self._timer.stop()
+
+    def write_batch_to_file(self) -> bool:
+        """Whether the current batch needs to be written to an S3 file"""
+        if len(self._current_batch) >= self.records_per_file:
+            return True
+
+        if self._current_batch_bytes >= self.bytes_per_file:
+            return True
+
+        return False
 
     async def enqueue_batch_contents(self):
         """Write the current batch of records to the S3 writer's queue"""
@@ -238,6 +282,7 @@ class S3FileBatcher:
         partition = self.kafka_partition
         starting_offset = self._starting_offset
         extension = f"json{'' if self.compression_type == 'none' else '.bz2'}"
+
         return f"{topic}_{partition}_{starting_offset}.{extension}"
 
 
@@ -250,14 +295,13 @@ async def build_batch_of_records_from_kafka(
     """Read Kafka records from an async queue, building up batches of them to
     write to disk before they make their way into S3"""
     batcher = S3FileBatcher(
-        kafka_topic=args.kafka_topic,
+        args=args,
         kafka_partition=kafka_partition,
-        records_per_file=args.records_per_file,
-        compression_type=args.compression_type,
         s3_writer_queue=s3_writer_queue,
     )
     while True:
-        # Use a "blocking" await on the queue with Kafka records
+        # Use a "blocking" await on the queue with Kafka records which will
+        # wait until a record actually shows up in the queue before returning
         kafka_record = await kafka_queue.get()
         await batcher.ingest_record(kafka_record)
         kafka_queue.task_done()
