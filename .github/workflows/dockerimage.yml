@@ -64,6 +64,7 @@ jobs:
         env:
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
+          cp .env-s3-exporter-sample .env-s3-exporter
           docker-compose build --parallel
           docker-compose up -d
           python3 -m pip install webdriver-manager
@@ -77,5 +78,6 @@ jobs:
           INIT_CMD_TIME: "pitr 1577880000"
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
+          cp .env-s3-exporter-sample .env-s3-exporter
           docker-compose up -d
           ./ci_performance_regression_test.sh
