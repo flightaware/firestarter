@@ -6,6 +6,7 @@ import asyncio
 import bz2
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
+import json
 import logging
 import os
 from signal import Signals, SIGINT, SIGTERM
@@ -198,8 +199,10 @@ class S3FileBatcher:
 
     _current_batch: list = attr.ib(init=False, factory=list)
     _current_batch_bytes: int = attr.ib(init=False, factory=int)
-    _starting_offset: int = attr.ib(init=False, factory=int)
-    _last_offset_in_batch: int = attr.ib(init=False)
+    # starting and ending PITR values for the current batch
+    _start_pitr: int = attr.ib(init=False, factory=int)
+    _end_pitr: int = attr.ib(init=False)
+
     _timer: Timer = attr.ib(
         init=False,
         default=attr.Factory(
@@ -238,12 +241,17 @@ class S3FileBatcher:
         """Folder within S3 bucket to write files into"""
         return self.args.s3_bucket_folder
 
+    def record_pitr(self, record: ConsumerRecord) -> int:
+        """Return the PITR for a Kafka record produced by the connector
+        service"""
+        return json.loads(record.value)["pitr"]
+
     async def ingest_record(self, record: ConsumerRecord):
         """Ingest a record from Kafka, adding it to the current batch and
         writing a file to the S3 writer queue if necessary
         """
         if not self._current_batch:
-            self._starting_offset = record.offset
+            self._start_pitr = self.record_pitr(record)
             self._timer.start()
 
         # Even though we might exceed the max bytes, that's okay since it's
@@ -253,8 +261,8 @@ class S3FileBatcher:
         self._current_batch_bytes += len(record.value)
 
         if self.write_batch_to_file():
-            self._last_offset_in_batch = record.offset
-            await self.enqueue_batch_contents()
+            self._end_pitr = self.record_pitr(record)
+            await self.enqueue_batch_contents(record.offset)
 
             self._current_batch = []
             self._current_batch_bytes = 0
@@ -270,7 +278,7 @@ class S3FileBatcher:
 
         return False
 
-    async def enqueue_batch_contents(self):
+    async def enqueue_batch_contents(self, offset: int):
         """Write the current batch of records to the S3 writer's queue"""
         filename = self.batch_filename()
 
@@ -281,7 +289,7 @@ class S3FileBatcher:
         s3_object = S3WriteObject(
             key=filename,
             body=file_contents,
-            last_offset=self._last_offset_in_batch,
+            last_offset=offset,
         )
 
         await self.s3_writer_queue.put(s3_object)
@@ -291,10 +299,11 @@ class S3FileBatcher:
         folder = "" if not self.s3_bucket_folder else f"{self.s3_bucket_folder}/"
         topic = self.kafka_topic
         partition = self.kafka_partition
-        starting_offset = self._starting_offset
+        start_pitr = self._start_pitr
+        end_pitr = self._end_pitr
         extension = f"json{'' if self.compression_type == 'none' else '.bz2'}"
 
-        return f"{folder}{topic}_{partition}_{starting_offset}.{extension}"
+        return f"{folder}{topic}_{partition}_{start_pitr}_{end_pitr}.{extension}"
 
 
 async def build_batch_of_records_from_kafka(

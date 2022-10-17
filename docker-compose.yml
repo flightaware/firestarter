@@ -104,14 +104,21 @@ services:
     build:
       context: .
       dockerfile: s3-exporter/Dockerfile
+    # Use a separate environment variable file for the s3 exporter to keep its settings
+    # distinct from any other service. See ./.env-s3-exporter-sample for a documented file
+    # with all environment variables supported by the service.
     env_file: ./.env-s3-exporter
     environment:
       # PYTHON settings for logging purposes
       - PYTHONUNBUFFERED=1
     init: true
+    restart: unless-stopped
     networks:
       - internal
     volumes:
+      # Map the docker-compose user's aws home directory
+      # into the container although AWS credentials can also
+      # be provided in environment variables
       - ~/.aws:/home/firestarter/.aws:ro
     logging:
       driver: "json-file"
