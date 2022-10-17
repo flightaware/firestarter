@@ -101,6 +101,29 @@ based on PostgreSQL. Other databases could potentially be supported with little
 effort. To prevent bloat, flights and positions older than 48 hours are
 automatically dropped from the table.
 
+### s3-exporter
+The s3-exporter service reads Kafka records produced by the connector service and writes
+them to files in S3. The files in S3 will each contain a threshold number of Kafka records
+or a (rough) threshold number of bytes. Each file can optionally be compressed using bzip.
+The threshold number of records is adhered to exactly whereas the threshold number of bytes
+can be exceeded a bit, so it is only a rough ceiling. Further, the threshold number of bytes
+only applies to the uncompressed bytes of the file. Files written to S3 will be named in the
+following format:
+
+```
+<optional folder name><Kafka topic>_<Topic partition>_<start PITR>_<end PITR>.json<.bz2 if compressed>
+```
+
+The s3-exporter is an asyncio script that several co-routines for each partition in the
+Kafka topic being read from with co-routines communicating using [async queues](https://docs.python.org/3/library/asyncio-queue.html):
+
+- One coroutine reads records from Kafka and commits consumer offsets 
+- One coroutine builds batches of Kafka records to go into a single S3 file
+- One coroutine writes files to S3
+
+The s3-exporter uses [`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) 
+with a [`ThreadPoolExecutor`](https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor) for writing to S3.
+
 ### fids
 The fids sample application is a webapp backed by the flights and positions
 databases. You can use it to browse flight data by airport, presenting flights
