@@ -110,10 +110,9 @@ def parse_script_args() -> None:
     KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
-        resumption_pitr = get_last_pitr_produced()
-        if resumption_pitr:
-            INIT_CMD_TIME = f"pitr {resumption_pitr}"
+        if (resumption_pitr := get_last_pitr_produced()) :
             print(f"Resuming Firehose reading from PITR {resumption_pitr}")
+            INIT_CMD_TIME = f"pitr {resumption_pitr}"
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
     INIT_CMD_ARGS = os.environ.get("INIT_CMD_ARGS", "")
@@ -123,7 +122,6 @@ def parse_script_args() -> None:
                 f'$INIT_CMD_ARGS should not contain the "{command}" command. '
                 "It belongs in its own variable."
             )
-
 
 def get_last_pitr_produced() -> Optional[int]:
     """See what the last PITR produced was to use for resuming from Firehose"""
@@ -153,21 +151,36 @@ def get_last_pitr_produced() -> Optional[int]:
             watermarks = consumer.get_watermark_offsets(topic_partition, timeout)
 
             if watermarks is None:
+                print(f"Failed to get watermarks for partition {partition_id}")
                 continue
 
+            # The returned watermarks are [low, high) so decrement by 1
+            # to get the last offset produced for the given topic
             low, high = watermarks
+            high -= 1
+
             # Means there aren't any records in the partition
-            if low >= high - 1:
+            if low >= high:
+                print(f"No records in partition {partition_id}")
                 continue
 
-            consumer.assign([TopicPartition(topic_of_interest, partition_id, high - 1)])
+            consumer.assign([TopicPartition(topic_of_interest, partition_id, high)])
             last_record = consumer.poll(timeout)
             if last_record is None:
+                print(f"Timed out reading offset {high} from partition {partition_id}")
                 continue
 
-            last_record_payload = json.loads(last_record.value())
-            last_record_pitr = last_record_payload["pitr"]
+            try:
+                last_record_payload = last_record.value()
+                last_record_dict = json.loads(last_record_payload)
+            except json.JSONDecodeError as error:
+                print(
+                    f"Failed to decode JSON with payload '{last_record_payload}' from "
+                    f"topic {topic_of_interest} in partition {partition_id} at offset {high}"
+                )
+                continue
 
+            last_record_pitr = last_record_dict["pitr"]
             pitr = last_record_pitr if pitr is None else max(pitr, last_record_pitr)
 
         return pitr
