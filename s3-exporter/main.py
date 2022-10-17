@@ -45,6 +45,11 @@ def parse_args() -> ap.Namespace:
         "--s3-bucket", default=os.getenv("S3_BUCKET", ""), help="S3 bucket to write files into"
     )
     parser.add_argument(
+        "--s3-bucket-folder",
+        default=os.getenv("S3_BUCKET_FOLDER", ""),
+        help="Folder in S3 bucket to write files into",
+    )
+    parser.add_argument(
         "--kafka-brokers",
         default=os.getenv("KAFKA_BROKERS", "kafka:9092"),
         help="URI for the Kafka brokers",
@@ -228,6 +233,11 @@ class S3FileBatcher:
         """Compression type to use (if any) for the S3 files"""
         return self.args.compression_type
 
+    @property
+    def s3_bucket_folder(self) -> str:
+        """Folder within S3 bucket to write files into"""
+        return self.args.s3_bucket_folder
+
     async def ingest_record(self, record: ConsumerRecord):
         """Ingest a record from Kafka, adding it to the current batch and
         writing a file to the S3 writer queue if necessary
@@ -278,12 +288,13 @@ class S3FileBatcher:
 
     def batch_filename(self) -> str:
         """Filename to use in S3 for writing out the records from Kafka"""
+        folder = "" if not self.s3_bucket_folder else f"{self.s3_bucket_folder}/"
         topic = self.kafka_topic
         partition = self.kafka_partition
         starting_offset = self._starting_offset
         extension = f"json{'' if self.compression_type == 'none' else '.bz2'}"
 
-        return f"{topic}_{partition}_{starting_offset}.{extension}"
+        return f"{folder}{topic}_{partition}_{starting_offset}.{extension}"
 
 
 async def build_batch_of_records_from_kafka(
