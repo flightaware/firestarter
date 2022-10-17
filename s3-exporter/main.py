@@ -18,7 +18,7 @@ from aiokafka.errors import KafkaConnectionError
 import attr
 import boto3
 from codetiming import Timer
-from humanfriendly import parse_size
+from humanfriendly import format_size, parse_size
 
 
 def log_levels() -> Tuple[str, ...]:
@@ -208,8 +208,7 @@ class S3FileBatcher:
         default=attr.Factory(
             lambda self: Timer(
                 name=f"s3_batcher_{self.kafka_partition}",
-                text=f"{{name}}: Built a batch of {self.records_per_file} "
-                f"Kafka records in {{seconds:.2f}} s",
+                text="{name}: Built a batch of Kafka records in {seconds:.2f} s",
                 logger=logging.info,
             ),
             takes_self=True,
@@ -241,6 +240,17 @@ class S3FileBatcher:
         """Folder within S3 bucket to write files into"""
         return self.args.s3_bucket_folder
 
+    @property
+    def batch_length(self) -> int:
+        """Length of the current batch"""
+        return len(self._current_batch)
+
+    @property
+    def batch_bytes(self) -> str:
+        """Humanify friendly str for the number of bytes in the current
+        batch"""
+        return format_size(self._current_batch_bytes, binary=True)
+
     def record_pitr(self, record: ConsumerRecord) -> int:
         """Return the PITR for a Kafka record produced by the connector
         service"""
@@ -260,15 +270,17 @@ class S3FileBatcher:
         self._current_batch.append(record.value)
         self._current_batch_bytes += len(record.value)
 
-        if self.write_batch_to_file():
+        if self.should_write_batch_to_file():
             self._end_pitr = self.record_pitr(record)
             await self.enqueue_batch_contents(record.offset)
 
+            self._timer.stop()
+            logging.info(f"Current batch has {self.batch_length:,} records with {self.batch_bytes}")
+
             self._current_batch = []
             self._current_batch_bytes = 0
-            self._timer.stop()
 
-    def write_batch_to_file(self) -> bool:
+    def should_write_batch_to_file(self) -> bool:
         """Whether the current batch needs to be written to an S3 file"""
         if len(self._current_batch) >= self.records_per_file:
             return True
