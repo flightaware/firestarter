@@ -110,9 +110,14 @@ def parse_script_args() -> None:
     KEEPALIVE = int(os.environ.get("KEEPALIVE", "60"))
     KEEPALIVE_STALE_PITRS = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
     KEEPALIVE_PRODUCE = os.environ.get("KEEPALIVE_PRODUCE", "true").lower() == "true"
+    if not KEEPALIVE_PRODUCE:
+        print("Not producing keepalive messages to Kafka")
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
-        # Make a couple attempts to retrieve this
+        print("Attempting to fetch resumption PITR from last Kafka record(s)")
+
+        # Make a couple attempts to retrieve the resumption PITR since Kafka
+        # might not yet be available
         for _ in range(2):
             if (resumption_pitr := get_last_pitr_produced()) :
                 print(f"Resuming Firehose reading from PITR {resumption_pitr}")
