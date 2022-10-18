@@ -374,7 +374,7 @@ async def write_files_to_s3(
         )
 
         # Write to S3 using the ThreadPoolExecutor since boto3 isn't async
-        logging.info(f"Attempting to write {s3_write_object.key} to S3...")
+        logging.info(f"Attempting to write {s3_write_object.key} to S3 bucket {args.s3_bucket}...")
         timer.start()
 
         partial_s3_put = partial(
