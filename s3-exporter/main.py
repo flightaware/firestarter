@@ -451,7 +451,7 @@ if __name__ == "__main__":
     )
     logging.info(
         f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records, "
-        f"{parse_size(ARGS.bytes_per_file)} and will be compressed with {ARGS.compression_type}"
+        f"{format_size(ARGS.bytes_per_file)} and will be compressed with {ARGS.compression_type}"
     )
 
     LOOP = asyncio.get_event_loop()
