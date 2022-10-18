@@ -28,12 +28,11 @@ def log_levels() -> Tuple[str, ...]:
 
 def setup_logging(args: ap.Namespace) -> None:
     """Setup logging format and level"""
-    log_format = "%(asctime)s %(levelname)8s: (%(funcName)s) %(message)s"
+    log_format = "%(levelname)8s: (%(funcName)s) %(message)s"
 
     logging.basicConfig(
         level=args.log_level,
         format=log_format,
-        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Make other loggers quiet
