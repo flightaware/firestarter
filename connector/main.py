@@ -253,6 +253,7 @@ async def print_stats(period: int) -> None:
             if catchup_rate:
                 print(f"Total catchup rate: {catchup_rate:.2f}x")
             print(f"Total messages received: {total_lines}")
+            print(f"Last good PITR: {last_good_pitr}")
             print()
             lines_read = 0
             bytes_read = 0
