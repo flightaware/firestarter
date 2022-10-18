@@ -382,9 +382,7 @@ async def write_files_to_s3(
 
         # Get some timing stats on how long it takes to write to S3
         timer = Timer(
-            text=f"Successfully wrote {s3_write_object.key} to S3 "
-            f"with {args.records_per_file:,} Kafka records in "
-            f"{{seconds:.2f}} ms",
+            text=f"Wrote {s3_write_object.key} to S3 in {{seconds:.2f}} s",
             logger=logging.info,
         )
 
