@@ -9,7 +9,7 @@ run-s3-exporter-workload:
 	docker-compose build connector s3-exporter
 	docker-compose up -d kafka zookeeper
 	sleep 5
-	docker-compose up -d connector s3-exporter
+	docker-compose --env-file ./.env -- up -d connector s3-exporter
 
 docker-clean:
 	docker-compose down --volumes
