@@ -112,9 +112,16 @@ def parse_script_args() -> None:
     KEEPALIVE_PRODUCE = os.environ.get("KEEPALIVE_PRODUCE", "true").lower() == "true"
     INIT_CMD_TIME = os.environ.get("INIT_CMD_TIME", "live")
     if os.environ.get("RESUME_FROM_LAST_PITR", "false").lower() == "true":
-        if (resumption_pitr := get_last_pitr_produced()) :
-            print(f"Resuming Firehose reading from PITR {resumption_pitr}")
-            INIT_CMD_TIME = f"pitr {resumption_pitr}"
+        # Make a couple attempts to retrieve this
+        for _ in range(2):
+            if (resumption_pitr := get_last_pitr_produced()) :
+                print(f"Resuming Firehose reading from PITR {resumption_pitr}")
+                INIT_CMD_TIME = f"pitr {resumption_pitr}"
+                break
+            else:
+                print("Got nothing back from Kafka, sleeping and trying again")
+                time.sleep(3)
+
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:
         raise ValueError(f'$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
     INIT_CMD_ARGS = os.environ.get("INIT_CMD_ARGS", "")

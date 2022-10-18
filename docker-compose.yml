@@ -102,34 +102,123 @@ services:
     depends_on:
       - kafka
 
-#  s3-exporter:
-#    image: "ghcr.io/flightaware/firestarter/firestarter_s3-exporter:${FS_VERSION:-latest}"
-#    build:
-#      context: .
-#      dockerfile: s3-exporter/Dockerfile
-#    # Use a separate environment variable file for the s3 exporter to keep its settings
-#    # distinct from any other service. See ./.env-s3-exporter-sample for a documented file
-#    # with all environment variables supported by the service.
-#    env_file: ./.env-s3-exporter
-#    environment:
-#      # PYTHON settings for logging purposes
-#      - PYTHONUNBUFFERED=1
-#    init: true
-#    restart: unless-stopped
-#    networks:
-#      - internal
-#    volumes:
-#      # Map the docker-compose user's aws home directory
-#      # into the container although AWS credentials can also
-#      # be provided in environment variables
-#      - ~/.aws:/home/firestarter/.aws:ro
-#    logging:
-#      driver: "json-file"
-#      options:
-#        max-size: "8mb"
-#        max-file: "3"
-#    depends_on:
-#      - kafka
+  position-db-updater:
+    image: "ghcr.io/flightaware/firestarter/firestarter_db-updater:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: db-updater/Dockerfile
+    init: true
+    networks:
+      - internal
+    environment:
+      # URL to database that will be updated based on Firehose contents.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - PYTHONUNBUFFERED=1
+      # Same kafka topic name as the producer of the feed that you want to consume
+      - KAFKA_TOPIC_NAME=events
+      # Consumers with the same group name will split the data between them,
+      # but consumers with different group names will each receive all of the messages 
+      - KAFKA_GROUP_NAME=position_group1
+      # Set this to "flights" or "positions" depending on what kinds of messages this updater is handling
+      - TABLE=positions
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+    depends_on:
+      - kafka
+      - timescaledb
+
+  fids-backend:
+    image: "ghcr.io/flightaware/firestarter/firestarter_fids:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: fids/Dockerfile
+    init: true
+    networks:
+      internal:
+        aliases:
+          - fids-backend
+    environment:
+      # URL to database that is being updated by db-updater.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - FLIGHTS_DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
+      - POSITIONS_DB_URL=${POSITIONS_DB_URL:-postgresql://postgres:positions@timescaledb:5432}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - data:/home/firestarter/app/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+  fids-frontend:
+    image: "ghcr.io/flightaware/fids_frontend/fids-frontend:${FIDS_VERSION:-latest}"
+    ports:
+      # Port upon which to serve webapp
+      - "${WEB_SERVER_PORT:-8080}:80"
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+
+  map:
+    image: "ghcr.io/flightaware/firestarter/firestarter_map:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: map/Dockerfile
+    init: true
+    ports:
+      # Port upon which to serve webapp
+      - "${MAP_SERVER_PORT:-5001}:5001"
+    networks:
+      - internal
+    environment:
+      - PYTHONUNBUFFERED=1
+      - KAFKA_TOPIC_NAME=events
+      - KAFKA_GROUP_NAME=map_group
+      - GOOGLE_MAPS_API_KEY
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+    depends_on:
+      - kafka
+
+  s3-exporter:
+    image: "ghcr.io/flightaware/firestarter/firestarter_s3-exporter:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: s3-exporter/Dockerfile
+    environment:
+      # PYTHON settings for logging purposes
+      - PYTHONUNBUFFERED=1
+    init: true
+    restart: unless-stopped
+    networks:
+      - internal
+    #volumes:
+      # Map the docker-compose user's aws home directory
+      # into the container although AWS credentials can also
+      # be provided in environment variables
+      # This is turned off by default, but comment out to provide
+      # credentials this way rather than through environment variables
+      #- ~/.aws:/home/firestarter/.aws:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "8mb"
+        max-file: "3"
+    depends_on:
+      - kafka
 
   zookeeper:
     image: "bitnami/zookeeper:3.6.2"
@@ -156,10 +245,21 @@ services:
     depends_on:
       - zookeeper
 
+  timescaledb:
+    image: "timescale/timescaledb:1.7.4-pg12"
+    init: true
+    networks:
+      - internal
+    environment:
+      - POSTGRES_PASSWORD=positions
+    volumes:
+      - position_data:/var/lib/postgresql/data
+
 volumes:
   data:
   kafka_data:
   zookeeper_data:
+  position_data:
 
 networks:
   internal:

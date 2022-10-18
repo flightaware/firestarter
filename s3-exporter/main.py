@@ -36,6 +36,10 @@ def setup_logging(args: ap.Namespace) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    # Make other loggers quiet
+    for _ in ("boto", "asyncio", "aiokafka"):
+        logging.getLogger(_).setLevel(logging.INFO)
+
 
 def parse_args() -> ap.Namespace:
     """Parse command-line arguments, using environment variables to override

@@ -114,6 +114,8 @@ following format:
 <optional folder name><Kafka topic>_<Topic partition>_<start PITR>_<end PITR>.json<.bz2 if compressed>
 ```
 
+Each line in the file contains a single JSON object, which follows the [JSON lines format](https://jsonlines.org/).
+
 The s3-exporter is an asyncio script that several co-routines for each partition in the
 Kafka topic being read from with co-routines communicating using [async queues](https://docs.python.org/3/library/asyncio-queue.html):
 
@@ -123,6 +125,7 @@ Kafka topic being read from with co-routines communicating using [async queues](
 
 The s3-exporter uses [`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html) 
 with a [`ThreadPoolExecutor`](https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor) for writing to S3.
+It uses [`aiokafka`](https://aiokafka.readthedocs.io/en/stable/) for communicating with Kafka.
 
 ### fids
 The fids sample application is a webapp backed by the flights and positions
