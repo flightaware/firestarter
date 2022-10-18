@@ -13,6 +13,7 @@ env:
   PRINT_STATS_PERIOD: 0
   FH_USERNAME: ${{ secrets.FH_USERNAME }}
   FH_APIKEY: ${{ secrets.FH_APIKEY }}
+  S3_BUCKET: testing
 
 jobs:
   test:
