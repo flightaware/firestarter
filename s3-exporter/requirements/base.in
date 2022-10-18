@@ -3,3 +3,4 @@ aiokafka
 boto3
 codetiming
 humanfriendly
+setproctitle

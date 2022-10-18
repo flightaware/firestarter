@@ -19,6 +19,7 @@ import attr
 import boto3
 from codetiming import Timer
 from humanfriendly import format_size, parse_size
+from setproctitle import setproctitle
 
 
 def log_levels() -> Tuple[str, ...]:
@@ -442,6 +443,7 @@ async def main(args: ap.Namespace):
 
 if __name__ == "__main__":
     ARGS = parse_args()
+    setproctitle(f"s3-exporter-{ARGS.s3_bucket}")
 
     setup_logging(ARGS)
     logging.info(
