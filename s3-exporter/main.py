@@ -70,6 +70,14 @@ def parse_args() -> ap.Namespace:
         help="Maximum size of the asyncio Queues used",
     )
     parser.add_argument(
+        "--batch-strategy",
+        choices=("records", "bytes", "both"),
+        default=os.getenv("BATCH_STRATEGY", "both").lower(),
+        help="Whether to batch S3 files based on a threshold number of "
+        "records, bytes, or both (where whichever threshold is hit "
+        "first is the one that wins)",
+    )
+    parser.add_argument(
         "--records-per-file",
         default=int(os.getenv("RECORDS_PER_FILE", "15000")),
         help="Threshold number of records in a file before writing to S3",
@@ -250,6 +258,11 @@ class S3FileBatcher:
         return len(self._current_batch)
 
     @property
+    def batch_strategy(self) -> str:
+        """Which batch strategy to use"""
+        return self.args.batch_strategy
+
+    @property
     def batch_bytes(self) -> str:
         """Humanify friendly str for the number of bytes in the current
         batch"""
@@ -286,13 +299,15 @@ class S3FileBatcher:
 
     def should_write_batch_to_file(self) -> bool:
         """Whether the current batch needs to be written to an S3 file"""
-        if len(self._current_batch) >= self.records_per_file:
-            return True
+        records_hit = len(self._current_batch) >= self.records_per_file
+        bytes_hit = self._current_batch_bytes >= self.bytes_per_file
 
-        if self._current_batch_bytes >= self.bytes_per_file:
-            return True
+        if self.batch_strategy == "records":
+            return records_hit
+        if self.batch_strategy == "bytes":
+            return bytes_hit
 
-        return False
+        return records_hit or bytes_hit
 
     async def enqueue_batch_contents(self, offset: int):
         """Write the current batch of records to the S3 writer's queue"""
@@ -451,9 +466,10 @@ if __name__ == "__main__":
         f"{ARGS.s3_bucket} from {ARGS.kafka_brokers}"
     )
     logging.info(
-        f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records, "
-        f"{format_size(ARGS.bytes_per_file, binary=True)} and will be "
-        f"compressed with {ARGS.compression_type}"
+        f"Each file in S3 will have {ARGS.records_per_file:,} Kafka records "
+        f"or {format_size(ARGS.bytes_per_file, binary=True)} and will be "
+        f"compressed with {ARGS.compression_type} using a batch strategy of "
+        f"{ARGS.batch_strategy}"
     )
 
     LOOP = asyncio.get_event_loop()
