@@ -119,7 +119,6 @@ def parse_script_args() -> None:
                 INIT_CMD_TIME = f"pitr {resumption_pitr}"
                 break
             else:
-                print("Got nothing back from Kafka, sleeping and trying again")
                 time.sleep(3)
 
     if INIT_CMD_TIME.split()[0] not in ["live", "pitr"]:

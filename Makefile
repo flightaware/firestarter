@@ -5,11 +5,11 @@ run-background:
 	docker-compose build --parallel && docker-compose up -d
 
 run-s3-exporter-workload:
-	docker-compose pull
+	docker-compose pull kafka zookeeper db-updater
 	docker-compose build connector s3-exporter
 	docker-compose up -d kafka zookeeper
 	sleep 5
-	docker-compose up -d connector db-updater s3-exporter
+	docker-compose up -d connector s3-exporter
 
 docker-clean:
 	docker-compose down --volumes
