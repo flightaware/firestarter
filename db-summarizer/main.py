@@ -386,11 +386,13 @@ def find_summarized_flights(producer: Producer, queue: Queue) -> None:
     so they can be removed from the database"""
 
     producer_topic = os.environ["PRODUCER_TOPIC_NAME"]
+    actual_arrival_cutoff = int(os.getenv("ARRIVAL_CUTOFF", "21600"))
     batch_size = int(os.getenv("BATCH_SIZE", "20000"))
+
     while not finished.is_set():
         finished.wait(10)
 
-        summarized_rows = summarized_flight_rows(cache_pitr())
+        summarized_rows = summarized_flight_rows(cache_pitr(), actual_arrival_cutoff)
         print(f"Processing {len(summarized_rows):,} summarized flight rows")
         if not summarized_rows:
             continue
