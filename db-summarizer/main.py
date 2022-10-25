@@ -440,15 +440,19 @@ def remove_summarized_flights_from_database(queue: Queue) -> None:
             if not flight_ids:
                 continue
 
-            with engine.begin() as conn:
-                id_chunks = chunk(flight_ids, SQLITE_VAR_LIMIT)
-                for keys in id_chunks:
-                    conn.execute(delete(table).where(table.c.id.in_(keys)))
-
+            _remove_summarized_flights_from_database(flight_ids)
             print(f"Deleted {len(flight_ids):,} summarized flights from database")
 
         except Empty:
             continue
+
+
+def _remove_summarized_flights_from_database(flight_ids: List[str]) -> None:
+    """Actually do the deletion from the database"""
+    with engine.begin() as conn:
+        id_chunks = chunk(flight_ids, SQLITE_VAR_LIMIT)
+        for keys in id_chunks:
+            conn.execute(delete(table).where(table.c.id.in_(keys)))
 
 
 def process_unknown_message(data: dict, _: int) -> None:

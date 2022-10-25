@@ -125,7 +125,7 @@ class TestInsertAndExpire(unittest.TestCase):
                 select([c for c in main.table.c if c.name != "changed" and c.name != "added"])
             )
             self.assertEqual(rows_in_table.fetchall(), expected_table_results)
-        main._expire_old_from_table()
+        main._expire_old_from_table(48)
         expired_rows_in_table = main.engine.execute(
             select([c for c in main.table.c if c.name != "changed" and c.name != "added"])
         )
@@ -152,9 +152,15 @@ class TestInsertAndExpire(unittest.TestCase):
                 select([c for c in main.table.c if c.name != "changed" and c.name != "added"])
             )
             self.assertEqual(rows_in_table.fetchall(), expected_table_results)
-        summarized = main.summarized_flight_rows(1589808413)
+        start_pitr = 1589808413
+        summarized = main.summarized_flight_rows(start_pitr)
 
         self.assertEqual(summarized, self.expected_flight_summaries)
+
+        main._remove_summarized_flights_from_database(
+            [row["id"] for row in self.expected_flight_summaries]
+        )
+        self.assertEqual(main.summarized_flight_rows(start_pitr), [])
 
     @patch.dict(
         "os.environ",
