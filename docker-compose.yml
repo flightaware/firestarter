@@ -90,9 +90,44 @@ services:
       # Consumers with the same group name will split the data between them,
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=group1
+      # Topic to produce summarized flight data to
+      - PRODUCER_TOPIC=flights-summaries
       # Set this to "flights" or "positions" depending on what kinds of messages this updater is handling
       - TABLE=flights
     volumes:
+      - data:/home/firestarter/app/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10mb"
+        max-file: "5"
+    depends_on:
+      - kafka
+
+  db-summarizer:
+    image: "ghcr.io/flightaware/firestarter/firestarter_db-summarizer:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: db-summarizer/Dockerfile
+    init: true
+    networks:
+      - internal
+    environment:
+      # URL to database that will be updated based on Firehose contents.
+      # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+      - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
+      - PYTHONUNBUFFERED=1
+      # Same kafka topic name as the producer of the feed that you want to consume
+      - KAFKA_TOPIC_NAME=events
+      # Consumers with the same group name will split the data between them,
+      # but consumers with different group names will each receive all of the messages 
+      - KAFKA_GROUP_NAME=group1
+      # Topic to produce summarized flight data to
+      - PRODUCER_TOPIC_NAME=flights-summaries
+      # Size of a batch of summarized flights when producing the PRODUCER_TOPIC
+      - BATCH_SIZE=20000
+    volumes:
+      # The table is always flights
       - data:/home/firestarter/app/db
     logging:
       driver: "json-file"
@@ -231,6 +266,65 @@ services:
       - COMPRESSION_TYPE
       # Log level. Can be debug, info, warning, error, or critical
       - LOG_LEVEL
+
+    init: true
+    restart: unless-stopped
+    networks:
+      - internal
+    #volumes:
+      # Map the docker-compose user's aws home directory
+      # into the container although AWS credentials can also
+      # be provided in environment variables
+      # This is turned off by default, but comment out to provide
+      # credentials this way rather than through environment variables
+      #- ~/.aws:/home/firestarter/.aws:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "8mb"
+        max-file: "3"
+    depends_on:
+      - kafka
+
+
+  s3-exporter-flights-summary:
+    image: "ghcr.io/flightaware/firestarter/firestarter_s3-exporter:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: s3-exporter/Dockerfile
+    environment:
+      # PYTHON settings for logging purposes
+      - PYTHONUNBUFFERED=1
+
+      # REQUIRED environment variables
+      # Firehose account username
+      - S3_BUCKET=${S3_BUCKET:?S3_BUCKET variable must be set}
+
+      # OPTIONAL environment variables
+      # Bucket folder: keep blank to avoid writing files to a folder
+      - S3_BUCKET_FOLDER=summary
+      # Kafka brokers (defaults to kafka:9092)
+      - KAFKA_BROKERS
+      # Kafka topic (defaults to events)
+      - KAFKA_TOPIC=flights-summaries
+      # Max size of the asyncio queues used by the coroutines
+      # Defaults to 0 which means there is not max size
+      - ASYNCIO_QUEUE_MAX_SIZE
+      # How to decide when a batch of records should be written to S3
+      # Can be records, bytes, or both. Defaults to both
+      - BATCH_STRATEGY=bytes
+      # Max records per file written to S3
+      # Defaults to 15k
+      - RECORDS_PER_FILE
+      # Max byes per file written to S3 
+      # Defaults to 10MB
+      # Once RECORDS_PER_FILE or BYTES_PER_FILE is reached, a file
+      # is written to S3
+      - BYTES_PER_FILE=128MB
+      # Compression type. Can be none or bzip. Defaults to none
+      - COMPRESSION_TYPE=bzip
+      # Log level. Can be debug, info, warning, error, or critical
+      - LOG_LEVEL=info
 
     init: true
     restart: unless-stopped
