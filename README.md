@@ -101,6 +101,12 @@ based on PostgreSQL. Other databases could potentially be supported with little
 effort. To prevent bloat, flights and positions older than 48 hours are
 automatically dropped from the table.
 
+### db-summarizer
+The db-summarizer is a simplified version of the db-updater that only uses the flights table
+in sqlite. It reads Firehose data from a Kafka topic, writes it to the sqlite database and then
+writes flights that have been canceled or arrived to a Kafka topic. It is intended that the topic
+written by the db-summarizer will be consumed by an instance of the s3-exporter.
+
 ### s3-exporter
 The s3-exporter service reads Kafka records produced by the connector service and writes
 them to files in S3. The files in S3 will each contain a threshold number of Kafka records
