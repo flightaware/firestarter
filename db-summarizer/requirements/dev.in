@@ -1,0 +1,4 @@
+-c base.txt
+mypy
+black
+pylint
