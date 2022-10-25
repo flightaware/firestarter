@@ -286,10 +286,16 @@ def flush_cache(consumer: Consumer) -> None:
             print(f"Committed offset {offset_to_commit}")
 
 
+def expiration_hours() -> int:
+    """Hour dropoff for expiring old flights in database"""
+    return int(os.getenv("EXPIRATION_HOURS", "48"))
+
+
 def expire_old_from_table() -> None:
     """Wrapper for _expire_old_from_table"""
-    hours = int(os.getenv("EXPIRATION_HOURS", "48"))
+    hours = expiration_hours()
     print(f"Expiring flights after {hours} hours without an update")
+
     while not finished.is_set():
         finished.wait(60)
         _expire_old_from_table(hours)
@@ -563,7 +569,7 @@ def main():
     setup_sqlite()
     if engine.has_table(TABLE):
         print(f"{TABLE} table already exists, clearing expired rows from {TABLE} before continuing")
-        _expire_old_from_table()
+        _expire_old_from_table(expiration_hours())
     meta.create_all(engine)
 
     processor_functions = {
