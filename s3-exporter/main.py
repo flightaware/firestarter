@@ -271,7 +271,7 @@ class S3FileBatcher:
     def record_pitr(self, record: ConsumerRecord) -> int:
         """Return the PITR for a Kafka record produced by the connector
         service"""
-        return json.loads(record.value)["pitr"]
+        return json.loads(record.value).get("pitr", record.offset)
 
     async def ingest_record(self, record: ConsumerRecord):
         """Ingest a record from Kafka, adding it to the current batch and
