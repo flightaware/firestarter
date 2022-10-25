@@ -288,14 +288,16 @@ def flush_cache(consumer: Consumer) -> None:
 
 def expire_old_from_table() -> None:
     """Wrapper for _expire_old_from_table"""
+    hours = int(os.getenv("EXPIRATION_HOURS", "48"))
+    print(f"Expiring flights after {hours} hours without an update")
     while not finished.is_set():
         finished.wait(60)
-        _expire_old_from_table()
+        _expire_old_from_table(hours)
 
 
-def _expire_old_from_table() -> None:
+def _expire_old_from_table(hours: int) -> None:
     """Remove entries from the database if they have not been updated in 48 hours"""
-    dropoff = datetime.now(tz=UTC) - timedelta(hours=48)
+    dropoff = datetime.now(tz=UTC) - timedelta(hours=hours)
     dtmin = datetime.min.replace(tzinfo=UTC)
     # pylint: disable=no-value-for-parameter
     statement = table.delete().where(

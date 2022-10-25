@@ -195,6 +195,8 @@ services:
       # Consumers with the same group name will split the data between them,
       # but consumers with different group names will each receive all of the messages 
       - KAFKA_GROUP_NAME=group1
+      # How many hours after an update to purge a flight from the flights table
+      - EXPIRATION_HOURS=18
       # Topic to produce summarized flight data to
       - PRODUCER_TOPIC_NAME=flights-summaries
       # Size of a batch of summarized flights when producing the PRODUCER_TOPIC
