@@ -21,6 +21,7 @@ from confluent_kafka import (
     Producer,
     TopicPartition,
 )  # type: ignore
+from setproctitle import setproctitle
 import sqlalchemy as sa  # type: ignore
 from sqlalchemy.sql import func, delete, select, bindparam, and_, or_  # type: ignore
 
@@ -144,7 +145,6 @@ class Cache(ABC):
         """Flush cache to the database"""
 
 
-
 class FlightCache(Cache):
     """Flight Cache Operations"""
 
@@ -203,11 +203,12 @@ class FlightCache(Cache):
             )
         if inserts:
             conn.execute(self.table.insert(), *inserts)
-    self.cache.clear()
 
-    offset = self._offset
-    self._offset = None
-    return offset
+        self.cache.clear()
+
+        offset = self._offset
+        self._offset = None
+        return offset
 
 
 cache: Cache = FlightCache(table)
@@ -367,6 +368,7 @@ def summarized_flight_rows(virtual_clock: int, cutoff: int = 21600) -> List[Dict
         for row in (dict(r) for r in result):
             row.pop("changed")
             row.pop("added")
+
             summarized_rows.append(row)
 
     return summarized_rows
@@ -626,6 +628,7 @@ def main():
 if __name__ == "__main__":
     # pylint: disable=broad-except
     try:
+        setproctitle("db-summarizer")
         main()
     except Exception as error:
         traceback.print_exc()
