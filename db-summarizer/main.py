@@ -137,8 +137,8 @@ class Cache(ABC):
     """A cache for accumulating flight or position information which can be flushed as necessary."""
 
     @abstractmethod
-    def add(self, data: dict, offset: int) -> None:
-        """Insert new row into the cache"""
+    def add(self, data: dict, offset: int, pitr: int) -> None:
+        """Insert new row into the cache including a Kafka offset and a PITR"""
 
     @abstractmethod
     def flush(self, conn) -> Optional[int]:
@@ -403,7 +403,7 @@ def find_summarized_flights(producer: Producer, queue: Queue) -> None:
                 producer.begin_transaction()
                 summarized_batch = summarized_rows[cur_idx : cur_idx + batch_size]
                 for row in summarized_batch:
-                    producer.produce(topic=producer_topic, value=json.dumps(row))
+                    producer.produce(topic=producer_topic, value=f"{json.dumps(row)}\n")
 
                 producer.commit_transaction()
                 print(f"Sent {len(summarized_batch):,} rows to {producer_topic} topic")
@@ -552,12 +552,10 @@ def setup_sqlite() -> None:
 
 def main():
     """Read flight updates from kafka and store them into the database"""
-    exists = False
     setup_sqlite()
     if engine.has_table(TABLE):
         print(f"{TABLE} table already exists, clearing expired rows from {TABLE} before continuing")
         _expire_old_from_table()
-        exists = True
     meta.create_all(engine)
 
     processor_functions = {
