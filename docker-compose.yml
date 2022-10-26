@@ -83,7 +83,7 @@ services:
     ports:
       # Provides optional access to the raw Firehose stream for consumption
       # by non-dockerized applications
-      - "${STREAMING_PORT:-127.0.0.1:1601}:1601"
+      - "${STREAMING_PORT:-127.0.0.1:1602}:1601"
     environment:
       # REQUIRED environment variables
       # Firehose account username
