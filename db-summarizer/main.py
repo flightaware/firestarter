@@ -279,11 +279,13 @@ def flush_cache(consumer: Consumer) -> None:
         offset_to_commit = None
         with cache_lock, engine.begin() as conn:
             offset_to_commit = cache.flush(conn)
+            pitr = cache.pitr
 
         if offset_to_commit:
             tp = TopicPartition(os.environ["KAFKA_TOPIC_NAME"], 0, offset_to_commit)
             consumer.commit(offsets=[tp], asynchronous=False)
-            print(f"Committed offset {offset_to_commit}")
+
+            print(f"Committed offset {offset_to_commit} for pitr {pitr}")
 
 
 def expiration_hours() -> int:

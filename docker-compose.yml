@@ -189,6 +189,7 @@ services:
       # URL to database that will be updated based on Firehose contents.
       # Documentation at https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
       - DB_URL=${FLIGHTS_DB_URL:-sqlite:///db/flights.db}
+      # Get print statements to the docker logs without buffering
       - PYTHONUNBUFFERED=1
       # Same kafka topic name as the producer of the feed that you want to consume
       - KAFKA_TOPIC_NAME=flights
