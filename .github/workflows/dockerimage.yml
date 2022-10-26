@@ -66,7 +66,7 @@ jobs:
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
           docker-compose build --parallel
-          docker-compose up -d
+          docker-compose up -d kafka zookeeper connector fids-backend fids-frontend
           python3 -m pip install webdriver-manager
           python3 -m pip install selenium
           python3 ci_ping_frontend.py
@@ -78,5 +78,5 @@ jobs:
           INIT_CMD_TIME: "pitr 1577880000"
           INIT_CMD_ARGS: "events \"flightplan departure arrival cancellation position\""
         run: |
-          docker-compose up -d
+          docker-compose up -d kafka zookeeper connector db-updater position-db-updater
           ./ci_performance_regression_test.sh
