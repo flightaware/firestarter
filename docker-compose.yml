@@ -65,10 +65,9 @@ services:
       # PYTHON settings
       - PYTHONUNBUFFERED=1
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10mb"
-        max-file: "5"
+        tag: "connector"
     depends_on:
       - kafka
 
@@ -136,10 +135,9 @@ services:
       # PYTHON settings
       - PYTHONUNBUFFERED=1
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10mb"
-        max-file: "5"
+        tag: "summary_connector"
     depends_on:
       - kafka
 
@@ -206,10 +204,9 @@ services:
       # The table is always flights
       - data:/home/firestarter/app/db
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "10mb"
-        max-file: "5"
+        tag: "db-summarizer"
     depends_on:
       - kafka
 
@@ -347,18 +344,17 @@ services:
     restart: unless-stopped
     networks:
       - internal
-    #volumes:
+    volumes:
       # Map the docker-compose user's aws home directory
       # into the container although AWS credentials can also
       # be provided in environment variables
       # This is turned off by default, but comment out to provide
       # credentials this way rather than through environment variables
-      #- ~/.aws:/home/firestarter/.aws:ro
+      - /data/.aws:/home/firestarter/.aws:ro
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "8mb"
-        max-file: "3"
+        tag: "s3-exporter"
     depends_on:
       - kafka
 
@@ -406,18 +402,17 @@ services:
     restart: unless-stopped
     networks:
       - internal
-    #volumes:
+    volumes:
       # Map the docker-compose user's aws home directory
       # into the container although AWS credentials can also
       # be provided in environment variables
       # This is turned off by default, but comment out to provide
       # credentials this way rather than through environment variables
-      #- ~/.aws:/home/firestarter/.aws:ro
+      - /data/.aws:/home/firestarter/.aws:ro
     logging:
-      driver: "json-file"
+      driver: "journald"
       options:
-        max-size: "8mb"
-        max-file: "3"
+        tag: "s3-exporter-flights-summary"
     depends_on:
       - kafka
 
@@ -430,6 +425,10 @@ services:
       - ALLOW_ANONYMOUS_LOGIN=yes
     volumes:
       - zookeeper_data:/bitnami/zookeeper
+    logging:
+      driver: "journald"
+      options:
+        tag: "zookeeper"
 
   kafka:
     image: "bitnami/kafka:3.1"
@@ -441,6 +440,10 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       # Retain messages for 6 hours
       - KAFKA_CFG_LOG_RETENTION_HOURS=6
+    logging:
+      driver: "journald"
+      options:
+        tag: "kafka"
     volumes:
       - kafka_data:/bitnami/kafka
     depends_on:
