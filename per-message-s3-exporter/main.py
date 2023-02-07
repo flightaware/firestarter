@@ -163,12 +163,12 @@ class S3FileBatcher:
 
     @property
     def records_per_file(self) -> int:
-        """Max number of Kafka records that make up an S3 file"""
+        """Max number of Firehose messages in an S3 file"""
         return self.args.records_per_file
 
     @property
     def bytes_per_file(self) -> int:
-        """Max number of bytes that make up an S3 file"""
+        """Max number of bytes in an S3 file"""
         return self.args.bytes_per_file
 
     @property
@@ -196,7 +196,7 @@ class S3FileBatcher:
         """Return the PITR for a Firehose message"""
         return json.loads(record)["pitr"]
 
-    async def ingest_record(self, record: Dict[str, str]):
+    async def ingest_record(self, record: str):
         """Ingest a record from Firehose, adding it to the current batch and
         writing a file to the S3 writer queue if necessary
         """
@@ -222,7 +222,7 @@ class S3FileBatcher:
 
     def should_write_batch_to_file(self) -> bool:
         """Whether the current batch needs to be written to an S3 file"""
-        records_hit = len(self._current_batch) >= self.records_per_file
+        records_hit = self.batch_length >= self.records_per_file
         bytes_hit = self._current_batch_bytes >= self.bytes_per_file
 
         if self.batch_strategy == "records":
