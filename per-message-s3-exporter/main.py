@@ -252,7 +252,7 @@ class S3FileBatcher:
     def _s3_bucket_folder(self) -> str:
         """YYYY/MM/DD folder name to write batch of messages into"""
         date_format = datetime.now().strftime("%Y/%m/%d")
-        return f"{message_type}/{date_format}"
+        return f"{self.message_type}/{date_format}"
 
     def _s3_file_extension(self) -> str:
         """File extension to use for uploads to S3"""
@@ -303,6 +303,7 @@ async def load_pitr_map(pitr_map_path: Path) -> Dict[str, int]:
             return json.loads(await pitr_map_file.read())
         except json.decoder.JSONDecodeError:
             return {}
+
 
 async def write_files_to_s3(
     args: ap.Namespace,

@@ -67,10 +67,7 @@ def pitr_map_from_file(init_time: str) -> Dict[str, int]:
         return {}
 
     start_pitr_from_env = int(init_time.split()[-1])
-    pitr_map = {
-        message_type: start_pitr_from_env
-        for message_type in FIREHOSE_MESSAGE_TYPES
-    }
+    pitr_map = {message_type: start_pitr_from_env for message_type in FIREHOSE_MESSAGE_TYPES}
 
     logging.info(f"Fetching start PITR from {pitr_map_file}")
     with pitr_map_file.open(encoding="utf-8") as pitr_map_file_obj:
