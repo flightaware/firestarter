@@ -51,6 +51,12 @@ async def event_wait(event: asyncio.Event, timeout: int) -> bool:
         return event.is_set()
 
 
+def pitr_map_location() -> Path:
+    """Grab the PITR map from the PITR_MAP environment variable with a default
+    useful for running this in Docker"""
+    return Path(os.getenv("PITR_MAP", "/home/firestarter/.pitrs"))
+
+
 def pitr_map_from_file(init_time: str) -> Dict[str, int]:
     """Load PITR map from file, filling in a PITR value based on the init_time
     when appropriate
@@ -61,18 +67,18 @@ def pitr_map_from_file(init_time: str) -> Dict[str, int]:
         logging.info("Starting Firehose stream from live")
         return {}
 
-    pitr_map_file = Path(os.environ["PITR_MAP"])
-    if not pitr_map_file.is_file():
-        logging.info(f"No PITR map on disk at {pitr_map_file}")
+    pitr_map_path = pitr_map_location()
+    if not pitr_map_path.is_file():
+        logging.info(f"No PITR map on disk at {pitr_map_path}")
         return {}
 
     start_pitr_from_env = int(init_time.split()[-1])
     pitr_map = {message_type: start_pitr_from_env for message_type in FIREHOSE_MESSAGE_TYPES}
 
-    logging.info(f"Fetching start PITR from {pitr_map_file}")
-    with pitr_map_file.open(encoding="utf-8") as pitr_map_file_obj:
+    logging.info(f"Fetching start PITRs from {pitr_map_path}")
+    with pitr_map_path.open(encoding="utf-8") as pitr_map_file:
         try:
-            pitr_map.update(json.loads(pitr_map_file_obj.read()))
+            pitr_map.update(json.loads(pitr_map_file.read()))
         except json.decoder.JSONDecodeError:
             logging.warning("PITR map file is empty or corrupted")
 

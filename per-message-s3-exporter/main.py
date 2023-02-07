@@ -24,7 +24,12 @@ from dotenv import load_dotenv
 from humanfriendly import format_size, parse_size
 from setproctitle import setproctitle
 
-from firehose_reader import AsyncFirehoseReader, FirehoseConfig, FIREHOSE_MESSAGE_TYPES
+from firehose_reader import (
+    AsyncFirehoseReader,
+    FirehoseConfig,
+    FIREHOSE_MESSAGE_TYPES,
+    pitr_map_location,
+)
 
 
 def log_levels() -> Tuple[str, ...]:
@@ -91,7 +96,7 @@ def parse_args() -> ap.Namespace:
     )
     parser.add_argument(
         "--pitr-map",
-        default=Path(os.environ["PITR_MAP"]),
+        default=pitr_map_location(),
         help="Path to the PITR map for resuming Firehose reading",
     )
 

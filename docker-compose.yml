@@ -311,7 +311,6 @@ services:
       - PYTHONUNBUFFERED=1
 
       # REQUIRED environment variables
-      # Firehose account username
       - S3_BUCKET=${S3_BUCKET:?S3_BUCKET variable must be set}
 
       # OPTIONAL environment variables
@@ -369,7 +368,6 @@ services:
       - PYTHONUNBUFFERED=1
 
       # REQUIRED environment variables
-      # Firehose account username
       - S3_BUCKET=${S3_BUCKET:?S3_BUCKET variable must be set}
 
       # OPTIONAL environment variables
@@ -413,6 +411,86 @@ services:
       driver: "journald"
       options:
         tag: "s3-exporter-flights-summary"
+    depends_on:
+      - kafka
+
+  per-message-s3-exporter:
+    image: "ghcr.io/flightaware/firestarter/firestarter_per-message-s3-exporter:${FS_VERSION:-latest}"
+    build:
+      context: .
+      dockerfile: per-message-s3-exporter/Dockerfile
+    environment:
+      # PYTHON settings for logging purposes
+      - PYTHONUNBUFFERED=1
+
+      # S3 bucket to write data into
+      - S3_BUCKET=${S3_BUCKET:?S3_BUCKET variable must be set}
+      # Firehose account username
+      - FH_USERNAME=${FH_USERNAME:?FH_USERNAME variable must be set}
+      # Firehose account key
+      - FH_APIKEY=${FH_APIKEY:?FH_APIKEY variable must be set}
+
+      # Max size of the asyncio queues used by the coroutines
+      # Defaults to 0 which means there is not max size
+      - ASYNCIO_QUEUE_MAX_SIZE
+      # How to decide when a batch of records should be written to S3
+      # Can be records, bytes, or both. Defaults to both
+      - BATCH_STRATEGY
+      # Max records per file written to S3
+      # Defaults to 15k
+      - RECORDS_PER_FILE
+      # Max byes per file written to S3 
+      # Defaults to 128MB
+      - BYTES_PER_FILE
+      # Compression type. Can be none or bzip. Defaults to none
+      - COMPRESSION_TYPE
+      # Log level. Can be debug, info, warning, error, or critical
+      - LOG_LEVEL
+
+      # OPTIONAL environment variables
+      # Firehose URL, defaults to firehose-test.flightaware.com.
+      # firehose.flightaware.com can also be used
+      - SERVER
+      # Streaming compression of incoming Firehose data. Valid values are gzip,
+      # deflate, or compress. Leave blank to disable compression.
+      - COMPRESSION
+      # Frequency in seconds to print stats about connection (messages/bytes
+      # per second). Defaults to 10.
+      - PRINT_STATS_PERIOD
+      # Frequency in seconds that Firehose should send a synthetic "keepalive"
+      # message to help connector ensure the connection is still alive. If no
+      # such message is received within roughly $keepalive seconds, connector
+      # will automatically reconnect to Firehose.
+      - KEEPALIVE
+      # The number of times that the same pitr seen in consecutive keeplive
+      # messages should trigger an error and a restart of the connection
+      - KEEPALIVE_STALE_PITRS
+      # "Time mode" of Firehose init command. Can be "live" or "pitr <pitr>";
+      # range is currently not supported.
+      - INIT_CMD_TIME
+      # The "optional" section of the Firehose init command. Mostly consists of
+      # filters for the data. Do not put username, password, keepalive, or
+      # compression commands here.
+      - INIT_CMD_ARGS
+
+    init: true
+    restart: always
+    networks:
+      - internal
+    volumes:
+      # Map the docker-compose user's aws home directory
+      # into the container although AWS credentials can also
+      # be provided in environment variables
+      # This is turned off by default, but comment out to provide
+      # credentials this way rather than through environment variables
+      - /data/.aws:/home/firestarter/.aws:ro
+
+      # Need a volume for the PITR map 
+      - pitr_map:/home/firestarter/.pitrs
+    logging:
+      driver: "journald"
+      options:
+        tag: "s3-exporter"
     depends_on:
       - kafka
 
@@ -464,6 +542,7 @@ volumes:
   kafka_data:
   zookeeper_data:
   position_data:
+  pitr_map:
 
 networks:
   internal:
