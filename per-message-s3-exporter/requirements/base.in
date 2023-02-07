@@ -1,0 +1,7 @@
+aiofiles
+attrs
+boto3
+codetiming
+humanfriendly
+python-dotenv
+setproctitle

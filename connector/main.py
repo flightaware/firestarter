@@ -337,9 +337,7 @@ async def read_firehose(time_mode: str) -> Optional[str]:
         if not KEEPALIVE_PRODUCE and message["type"] == "keepalive":
             continue
 
-        # FIXME: This makes keepalives a bit useless if they won't be showing
-        # up in order with any other messages
-        key = message.get("id", "").encode() or None
+        key = message["type"].encode()
         try:
             producer.produce(
                 os.environ["KAFKA_TOPIC_NAME"],
