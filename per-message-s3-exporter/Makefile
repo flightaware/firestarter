@@ -1,3 +1,3 @@
 include ../Makefile.inc
 
-PROGNAME=s3-exporter
+PROGNAME=per-message-s3-exporter

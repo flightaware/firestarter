@@ -490,9 +490,7 @@ services:
     logging:
       driver: "journald"
       options:
-        tag: "s3-exporter"
-    depends_on:
-      - kafka
+        tag: "per-message-s3-exporter"
 
   zookeeper:
     image: "bitnami/zookeeper:3.6.2"
