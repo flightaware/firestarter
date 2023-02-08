@@ -54,7 +54,7 @@ async def event_wait(event: asyncio.Event, timeout: int) -> bool:
 def pitr_map_location() -> Path:
     """Grab the PITR map from the PITR_MAP environment variable with a default
     useful for running this in Docker"""
-    return Path(os.getenv("PITR_MAP", "/home/firestarter/.pitrs"))
+    return Path(os.getenv("PITR_MAP", "/home/firestarter/pitrs/.pitrs-map"))
 
 
 def pitr_map_from_file(init_time: str) -> Dict[str, int]:

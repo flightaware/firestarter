@@ -485,8 +485,8 @@ services:
       # credentials this way rather than through environment variables
       - /data/.aws:/home/firestarter/.aws:ro
 
-      # Need a volume for the PITR map 
-      - pitr_map:/home/firestarter/.pitrs
+      # Need a volume for the PITRs map 
+      - pitrs_map:/home/firestarter/pitrs
     logging:
       driver: "journald"
       options:
@@ -540,7 +540,7 @@ volumes:
   kafka_data:
   zookeeper_data:
   position_data:
-  pitr_map:
+  pitrs_map:
 
 networks:
   internal:

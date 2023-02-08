@@ -19,6 +19,7 @@ USER firestarter
 ENV VIRTUAL_ENV=./venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+RUN mkdir /home/firestarter/pitrs
 COPY --chown=firestarter per-message-s3-exporter/firehose_reader.py .
 COPY --chown=firestarter per-message-s3-exporter/main.py .
 

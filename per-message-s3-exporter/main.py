@@ -360,6 +360,7 @@ async def write_files_to_s3(
         pitr_map[s3_write_object.message_type] = s3_write_object.end_pitr
         async with aiofiles.open(args.pitr_map, "w") as pitr_map_file:
             await pitr_map_file.write(json.dumps(pitr_map))
+            logging.info("Saved PITR map to disk")
 
 
 async def main(args: ap.Namespace):
@@ -404,7 +405,7 @@ async def main(args: ap.Namespace):
 if __name__ == "__main__":
     load_dotenv()
     ARGS = parse_args()
-    setproctitle(f"s3-exporter-{ARGS.s3_bucket}")
+    setproctitle(f"per-message-s3-exporter-{ARGS.s3_bucket}")
 
     setup_logging(ARGS)
     logging.info(
