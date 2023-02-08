@@ -79,7 +79,7 @@ def parse_args() -> ap.Namespace:
     )
     parser.add_argument(
         "--bytes-per-file",
-        default=parse_size(os.getenv("BYTES_PER_FILE", "125MB"), binary=True),
+        default=parse_size(os.getenv("BYTES_PER_FILE", "128MB"), binary=True),
         help="Threshold number of uncompressed bytes in a file before writing to S3",
     )
     parser.add_argument(
@@ -197,6 +197,20 @@ class S3FileBatcher:
         batch"""
         return format_size(self._current_batch_bytes, binary=True)
 
+    @property
+    def records_hit(self) -> bool:
+        """Whether the current batch exceeds the records threshold"""
+        return self.batch_length >= self.records_per_file
+
+    @property
+    def bytes_hit(self) -> bool:
+        """Whether the current batch exceeds the bytes threshold taking into
+        account more voluminous message types"""
+        if self.message_type in ("position", "flifo"):
+            return self._current_batch_bytes >= self.bytes_per_file
+
+        return self._current_batch_bytes >= (self.bytes_per_file // 10)
+
     def record_pitr(self, record: Dict[str, str]) -> int:
         """Return the PITR for a Firehose message"""
         return json.loads(record)["pitr"]
@@ -226,16 +240,16 @@ class S3FileBatcher:
             self._current_batch_bytes = 0
 
     def should_write_batch_to_file(self) -> bool:
-        """Whether the current batch needs to be written to an S3 file"""
-        records_hit = self.batch_length >= self.records_per_file
-        bytes_hit = self._current_batch_bytes >= self.bytes_per_file
-
+        """Whether the current batch needs to be written to an S3 file
+        In order to see less common message types, the bytes hit will be
+        significantly lower than for positions
+        """
         if self.batch_strategy == "records":
-            return records_hit
+            return self.records_hit
         if self.batch_strategy == "bytes":
-            return bytes_hit
+            return self.bytes_hit
 
-        return records_hit or bytes_hit
+        return self.records_hit or self.bytes_hit
 
     async def enqueue_batch_contents(self):
         """Write the current batch of records to the S3 writer's queue"""
