@@ -218,12 +218,12 @@ class FirehoseStats:
                 total_lines += self._lines_read
                 total_bytes += self._bytes_read
                 if period_seconds:
-                    logging.info(
+                    logging.debug(
                         f"Period messages/s {self._lines_read / period_seconds:>5.0f}, "
                         f"period bytes/s {self._bytes_read / period_seconds:>5.0f}"
                     )
                 if total_seconds:
-                    logging.info(
+                    logging.debug(
                         f"Total  messages/s {total_lines / total_seconds:>5.0f}, "
                         f"total  bytes/s {total_bytes / total_seconds:>5.0f}"
                     )

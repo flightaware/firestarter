@@ -442,6 +442,24 @@ async def main(args: ap.Namespace):
     await asyncio.gather(*tasks, return_exceptions=False)
 
 
+def batch_logging_message(args: ap.Namespace, common: bool = False) -> str:
+    """Generate a suitable logging message about the batch strategy and size"""
+    if not common:
+        records_msg = f"{args.records_per_file:,}"
+        bytes_msg = format_size(ARGS.bytes_per_file, binary=True)
+    else:
+        records_msg = f"{args.records_per_file_common_message_types:,}"
+        bytes_msg = format_size(ARGS.bytes_per_file_common_message_types, binary=True)
+
+    if args.batch_strategy == "bytes":
+        return bytes_msg
+
+    if args.batch_strategy == "records":
+        return records_msg
+
+    return f"{bytes_msg} or {records_msg}"
+
+
 if __name__ == "__main__":
     load_dotenv()
     ARGS = parse_args()
@@ -449,17 +467,16 @@ if __name__ == "__main__":
 
     setup_logging(ARGS)
     logging.info(
-        f"Each file in S3 will have {ARGS.records_per_file:,} messages "
-        f"or {format_size(ARGS.bytes_per_file, binary=True)} and will be "
-        f"compressed with {ARGS.compression_type} using a batch strategy of "
-        f"{ARGS.batch_strategy} in bucket {ARGS.s3_bucket}"
+        f"Each {'non-common-message-type ' if ARGS.common_message_types else ''}"
+        f"file in S3 will have {batch_logging_message(ARGS)} "
+        f"and will be compressed with {ARGS.compression_type} "
+        f"using a batch strategy of {ARGS.batch_strategy} in bucket {ARGS.s3_bucket}"
     )
+
     if ARGS.common_message_types:
-        bytes_threshold = format_size(ARGS.bytes_per_file_common_message_types, binary=True)
         logging.info(
-            f"Treating {ARGS.common_message_types} as common message types "
-            f"with {ARGS.records_per_file_common_message_types:,} messages "
-            f"or {bytes_threshold}"
+            f'Treating "{ARGS.common_message_types}" as common message types '
+            f"with {batch_logging_message(ARGS, True)}"
         )
 
     LOOP = asyncio.get_event_loop()
