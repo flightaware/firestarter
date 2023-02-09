@@ -78,9 +78,24 @@ def parse_args() -> ap.Namespace:
         help="Threshold number of records in a file before writing to S3",
     )
     parser.add_argument(
+        "--records-per-file-common-message-types",
+        default=int(os.getenv("RECORDS_PER_FILE_COMMON_MESSAGE_TYPES", "300000")),
+        help="Threshold number of records in a file for common message types (if specified)",
+    )
+    parser.add_argument(
         "--bytes-per-file",
-        default=parse_size(os.getenv("BYTES_PER_FILE", "128MB"), binary=True),
+        default=parse_size(os.getenv("BYTES_PER_FILE", "8MB"), binary=True),
         help="Threshold number of uncompressed bytes in a file before writing to S3",
+    )
+    parser.add_argument(
+        "--bytes-per-file-common-message-types",
+        default=parse_size(os.getenv("BYTES_PER_FILE_COMMON_MESSAGE_TYPES", "128MB"), binary=True),
+        help="Threshold number of uncompressed bytes for common message types (if specified)",
+    )
+    parser.add_argument(
+        "--common-message-types",
+        default=os.getenv("COMMON_MESSAGE_TYPES", ""),
+        help="Most voluminous message types (have separate byte and record threshold)",
     )
     parser.add_argument(
         "--compression-type",
@@ -167,13 +182,26 @@ class S3FileBatcher:
     )
 
     @property
+    def common_message_type(self) -> bool:
+        """Whether we are dealing with a common message type, i.e., a more
+        voluminous message type that can have its own byte and record
+        threshold"""
+        return self.message_type in self.args.common_message_types
+
+    @property
     def records_per_file(self) -> int:
         """Max number of Firehose messages in an S3 file"""
+        if self.common_message_type:
+            return self.args.records_per_file_common_message_types
+
         return self.args.records_per_file
 
     @property
     def bytes_per_file(self) -> int:
         """Max number of bytes in an S3 file"""
+        if self.common_message_type:
+            return self.args.bytes_per_file_common_message_types
+
         return self.args.bytes_per_file
 
     @property
@@ -206,14 +234,11 @@ class S3FileBatcher:
     def bytes_hit(self) -> bool:
         """Whether the current batch exceeds the bytes threshold taking into
         account more voluminous message types"""
-        if self.message_type in ("position", "flifo"):
-            return self._current_batch_bytes >= self.bytes_per_file
+        return self._current_batch_bytes >= self.bytes_per_file
 
-        return self._current_batch_bytes >= (self.bytes_per_file // 10)
-
-    def record_pitr(self, record: Dict[str, str]) -> int:
+    def record_pitr(self, record: str) -> int:
         """Return the PITR for a Firehose message"""
-        return json.loads(record)["pitr"]
+        return int(json.loads(record)["pitr"])
 
     async def ingest_record(self, record: str):
         """Ingest a record from Firehose, adding it to the current batch and
@@ -344,6 +369,7 @@ async def write_files_to_s3(
 
     # Load the PITR map from disk so we can start writing it
     pitr_map: Dict[str, int] = await load_pitr_map(args.pitr_map)
+    pitr_map = {message_type: int(pitr) for message_type, pitr in pitr_map.items()}
 
     while True:
         s3_write_object: S3WriteObject = await s3_queue.get()
@@ -428,6 +454,13 @@ if __name__ == "__main__":
         f"compressed with {ARGS.compression_type} using a batch strategy of "
         f"{ARGS.batch_strategy} in bucket {ARGS.s3_bucket}"
     )
+    if ARGS.common_message_types:
+        bytes_threshold = format_size(ARGS.bytes_per_file_common_message_types, binary=True)
+        logging.info(
+            f"Treating {ARGS.common_message_types} as common message types "
+            f"with {ARGS.records_per_file_common_message_types:,} messages "
+            f"or {bytes_threshold}"
+        )
 
     LOOP = asyncio.get_event_loop()
 

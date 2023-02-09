@@ -82,7 +82,7 @@ def pitr_map_from_file(init_time: str) -> Dict[str, int]:
         except json.decoder.JSONDecodeError:
             logging.warning("PITR map file is empty or corrupted")
 
-    return pitr_map
+    return {message_type: int(pitr) for message_type, pitr in pitr_map.items()}
 
 
 # pylint: disable=too-many-instance-attributes

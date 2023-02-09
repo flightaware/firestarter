@@ -442,6 +442,12 @@ services:
       # Max byes per file written to S3 
       # Defaults to 128MB
       - BYTES_PER_FILE
+      # Message types are particularly voluminous
+      # If set, allows for setting separate thresholds for these
+      - COMMON_MESSAGE_TYPES
+      # Separate thresholds for common message types 
+      - BYTES_PER_FILE_COMMON_MESSAGE_TYPES
+      - RECORDS_PER_FILE_COMMON_MESSAGE_TYPES
       # Compression type. Can be none or bzip. Defaults to none
       - COMPRESSION_TYPE
       # Log level. Can be debug, info, warning, error, or critical
