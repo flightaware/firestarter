@@ -37,6 +37,11 @@ FIREHOSE_MESSAGE_TYPES: List[str] = [
 ]
 
 
+def format_epoch(epoch: int) -> str:
+    """Format epoch timestamp as datetime"""
+    return datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M:%S")
+
+
 class ReadFirehoseErrorThreshold(Exception):
     """Raised when Firehose reading reaches a threshold"""
 
@@ -117,7 +122,7 @@ class FirehoseConfig:
         pitr_map = pitr_map_from_file(init_time)
         if pitr_map:
             min_pitr = min(pitr_map.values())
-            logging.info(f"Using {min_pitr} as starting PITR value")
+            logging.info(f"Using {min_pitr} ({format_epoch(min_pitr)}) as starting PITR value")
             init_time = f"pitr {min_pitr}"
 
         init_args = os.environ.get("INIT_CMD_ARGS", "")
@@ -232,11 +237,9 @@ class FirehoseStats:
                     logging.info(f"Total catchup rate: {catchup_rate:.2f}x")
 
                 logging.info(f"Total messages received: {total_lines:,}")
-
-                last_pitr_ts = datetime.fromtimestamp(self._last_good_pitr).strftime(
-                    "%Y-%m-%d %H:%M:%S"
+                logging.info(
+                    f"Last good PITR: {self._last_good_pitr} ({format_epoch(self._last_good_pitr)})"
                 )
-                logging.info(f"Last good PITR: {self._last_good_pitr} ({last_pitr_ts})")
 
                 self._lines_read = 0
                 self._bytes_read = 0

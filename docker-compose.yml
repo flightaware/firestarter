@@ -489,7 +489,7 @@ services:
       # be provided in environment variables
       # This is turned off by default, but comment out to provide
       # credentials this way rather than through environment variables
-      - /data/.aws:/home/firestarter/.aws:ro
+      - "${HOME}/.aws:/home/firestarter/.aws:ro"
 
       # Need a volume for the PITRs map 
       - pitrs_map:/home/firestarter/pitrs
