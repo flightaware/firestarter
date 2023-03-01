@@ -475,7 +475,7 @@ def check_for_diversions(data: dict) -> None:
         if ident in dest_cache:
             orig_dest = dest_cache.get(ident)
             if orig_dest != "":
-                if orig_dest != dest
+                if orig_dest != dest:
                     diversion(ident, dest)
 
         dest_cache[ident] = dest
