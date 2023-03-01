@@ -407,12 +407,17 @@ def process_unknown_message(data: dict) -> None:
     """Unknown message type"""
     print(f"Don't know how to handle message with type {data['type']}")
 
+def clear_dest_history(ident) -> None:
+    """Remove ident from dest_history"""
+    global dest_history
+    if ident in dest_history:
+        dest_history.pop(ident)
+    return
 
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
     if "ident" in data:
-        global dest_history
-        dest_history.pop(data.get("ident"))
+        clear_dest_history(data.get("ident"))
     return add_to_cache(data)
 
 
@@ -437,8 +442,7 @@ def process_offblock_message(data: dict) -> None:
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
     if "ident" in data:
-        global dest_history
-        dest_history.pop(data.get("ident"))
+        clear_dest_history(data.get("ident"))
     data["actual_in"] = data["clock"]
     return add_to_cache(data)
 
