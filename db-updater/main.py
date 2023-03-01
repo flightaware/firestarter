@@ -409,6 +409,8 @@ def process_unknown_message(data: dict) -> None:
 
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
+    if "ident" in data:
+        dest_cache.pop(data.get("ident"))
     return add_to_cache(data)
 
 
@@ -432,6 +434,8 @@ def process_offblock_message(data: dict) -> None:
 
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
+    if "ident" in data:
+        dest_cache.pop(data.get("ident"))
     data["actual_in"] = data["clock"]
     return add_to_cache(data)
 
@@ -457,6 +461,26 @@ def process_flifo_message(data: dict) -> None:
             data[v] = data.pop(k)
     return add_to_cache(data)
 
+def check_for_diversions(data: dict) -> None:
+    """ETMS message, check destination"""
+    if "dest" in data and "ident" in data:
+        dest = data.get("dest")
+        if dest == "":
+            return
+
+        ident = data.get("ident")
+        if ident == "":
+            return
+
+        if ident in dest_cache:
+            orig_dest = dest_cache.get(ident)
+            if orig_dest != "":
+                if orig_dest != dest
+                    diversion(ident, dest)
+
+        dest_cache[ident] = dest
+
+    return
 
 def process_extended_flight_info_message(data: dict) -> None:
     """extendedFlightInfo message type"""
@@ -534,6 +558,9 @@ def main():
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
         "position": process_position_message,
+        "etms_update": check_for_diversions,
+        "etms_scheduled": check_for_diversions,
+        "etms_filed": check_for_diversions,
     }
 
     consumer = None
