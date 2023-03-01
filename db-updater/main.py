@@ -494,7 +494,7 @@ def check_for_diversions(data: dict) -> None:
 
     return
 
-def diversion(flight: string, new_dest: string) -> None:
+def diversion(flight, new_dest) -> None:
     """Set flight table diversion to the new destination"""
     FlightCache.add({"id": flight, "diverted": new_dest});
     return
