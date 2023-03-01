@@ -188,6 +188,7 @@ finished = threading.Event()
 cache_lock = threading.Lock()
 SQLITE_VAR_LIMIT = None
 
+dest_history = dict()
 
 class Cache(ABC):
     """A cache for accumulating flight or position information which can be flushed as necessary."""
@@ -410,7 +411,8 @@ def process_unknown_message(data: dict) -> None:
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
     if "ident" in data:
-        dest_cache.pop(data.get("ident"))
+        global dest_history
+        dest_history.pop(data.get("ident"))
     return add_to_cache(data)
 
 
@@ -435,7 +437,8 @@ def process_offblock_message(data: dict) -> None:
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
     if "ident" in data:
-        dest_cache.pop(data.get("ident"))
+        global dest_history
+        dest_history.pop(data.get("ident"))
     data["actual_in"] = data["clock"]
     return add_to_cache(data)
 
@@ -464,6 +467,8 @@ def process_flifo_message(data: dict) -> None:
 def check_for_diversions(data: dict) -> None:
     """ETMS message, check destination"""
     if "dest" in data and "ident" in data:
+        global dest_history
+
         dest = data.get("dest")
         if dest == "":
             return
@@ -472,13 +477,13 @@ def check_for_diversions(data: dict) -> None:
         if ident == "":
             return
 
-        if ident in dest_cache:
-            orig_dest = dest_cache.get(ident)
+        if ident in dest_history:
+            orig_dest = dest_history.get(ident)
             if orig_dest != "":
                 if orig_dest != dest:
                     diversion(ident, dest)
 
-        dest_cache[ident] = dest
+        dest_history[ident] = dest
 
     return
 
