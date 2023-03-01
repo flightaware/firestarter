@@ -86,6 +86,7 @@ if TABLE == "flights":
         sa.Column("predicted_off", TIMESTAMP_TZ()),
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
+        sa.Column("diverted", sa.String),
     )
     VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo", "flifo"}
 elif TABLE == "positions":
@@ -407,17 +408,17 @@ def process_unknown_message(data: dict) -> None:
     """Unknown message type"""
     print(f"Don't know how to handle message with type {data['type']}")
 
-def clear_dest_history(ident) -> None:
-    """Remove ident from dest_history"""
+def clear_dest_history(flight) -> None:
+    """Remove id from dest_history"""
     global dest_history
-    if ident in dest_history:
-        dest_history.pop(ident)
+    if flight in dest_history:
+        dest_history.pop(flight)
     return
 
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
-    if "ident" in data:
-        clear_dest_history(data.get("ident"))
+    if "id" in data:
+        clear_dest_history(data.get("id"))
     return add_to_cache(data)
 
 
@@ -441,8 +442,8 @@ def process_offblock_message(data: dict) -> None:
 
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
-    if "ident" in data:
-        clear_dest_history(data.get("ident"))
+    if "id" in data:
+        clear_dest_history(data.get("id"))
     data["actual_in"] = data["clock"]
     return add_to_cache(data)
 
@@ -472,25 +473,30 @@ def process_flifo_message(data: dict) -> None:
 
 def check_for_diversions(data: dict) -> None:
     """ETMS message, check destination"""
-    if "dest" in data and "ident" in data:
+    if "dest" in data and "id" in data:
         global dest_history
 
         dest = data.get("dest")
         if dest == "":
             return
 
-        ident = data.get("ident")
-        if ident == "":
+        flight = data.get("id")
+        if flight == "":
             return
 
-        if ident in dest_history:
-            orig_dest = dest_history.get(ident)
+        if flight in dest_history:
+            orig_dest = dest_history.get(flight)
             if orig_dest != "":
                 if orig_dest != dest:
-                    diversion(ident, dest)
+                    diversion(flight, dest)
 
-        dest_history[ident] = dest
+        dest_history[flight] = dest
 
+    return
+
+def diversion(flight: string, new_dest: string) -> None:
+    """Set flight table diversion to the new destination"""
+    FlightCache.add({"id": flight, "diverted": new_dest});
     return
 
 def process_extended_flight_info_message(data: dict) -> None:
