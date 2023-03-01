@@ -86,7 +86,7 @@ if TABLE == "flights":
         sa.Column("predicted_off", TIMESTAMP_TZ()),
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
-        sa.Column("diverted", sa.String),
+        sa.Column("diverted", sa.Integer),
     )
     VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo", "flifo"}
 elif TABLE == "positions":
@@ -450,7 +450,7 @@ def process_onblock_message(data: dict) -> None:
 
 def process_flifo_message(data: dict) -> None:
     """flifo message type"""
-    # flightplan and flifo messages may contain a new dest indicating a diversion
+    # flightplan and flifo messages may contain a new dest indicating a diversion, flag it if so
     check_for_diversions(data)
     # flifo messages try to help us with saner names, but we already convert
     # field names at the sqlalchemy level, so we actually need to convert the
@@ -488,15 +488,10 @@ def check_for_diversions(data: dict) -> None:
             orig_dest = dest_history.get(flight)
             if orig_dest != "":
                 if orig_dest != dest:
-                    diversion(flight, dest)
+                    data["diverted"] = 1
 
         dest_history[flight] = dest
 
-    return
-
-def diversion(flight, new_dest) -> None:
-    """Set flight table diversion to the new destination"""
-    FlightCache.add({"id": flight, "diverted": new_dest});
     return
 
 def process_extended_flight_info_message(data: dict) -> None:
@@ -506,7 +501,7 @@ def process_extended_flight_info_message(data: dict) -> None:
 
 def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
-    # flightplan and flifo messages may contain a new dest indicating a diversion
+    # flightplan and flifo messages may contain a new dest indicating a diversion, flag it if so
     check_for_diversions(data)
     disambiguate_altitude(data)
     return add_to_cache(data)
