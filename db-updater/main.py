@@ -449,6 +449,8 @@ def process_onblock_message(data: dict) -> None:
 
 def process_flifo_message(data: dict) -> None:
     """flifo message type"""
+    # flightplan and flifo messages may contain a new dest indicating a diversion
+    check_for_diversions(data)
     # flifo messages try to help us with saner names, but we already convert
     # field names at the sqlalchemy level, so we actually need to convert the
     # nice names to ugly names so they can be converted again later...
@@ -498,6 +500,8 @@ def process_extended_flight_info_message(data: dict) -> None:
 
 def process_flightplan_message(data: dict) -> None:
     """Flightplan message type"""
+    # flightplan and flifo messages may contain a new dest indicating a diversion
+    check_for_diversions(data)
     disambiguate_altitude(data)
     return add_to_cache(data)
 
@@ -567,9 +571,6 @@ def main():
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
         "position": process_position_message,
-        "etms_update": check_for_diversions,
-        "etms_scheduled": check_for_diversions,
-        "etms_filed": check_for_diversions,
     }
 
     consumer = None
