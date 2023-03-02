@@ -473,8 +473,6 @@ def process_flifo_message(data: dict) -> None:
 
 def check_for_diversions(data: dict) -> None:
     """ETMS message, check destination"""
-    # DEBUG always set this temporarily
-    data["diverted"] = 1
     if "dest" in data and "id" in data:
         global dest_history
 
