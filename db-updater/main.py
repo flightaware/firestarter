@@ -408,12 +408,6 @@ def process_unknown_message(data: dict) -> None:
     """Unknown message type"""
     print(f"Don't know how to handle message with type {data['type']}")
 
-def clear_dest_history(flight) -> None:
-    """Remove id from dest_history"""
-    global dest_history
-    if flight in dest_history:
-        dest_history.pop(flight)
-    return
 
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
@@ -471,28 +465,6 @@ def process_flifo_message(data: dict) -> None:
             data[v] = data.pop(k)
     return add_to_cache(data)
 
-def check_for_diversions(data: dict) -> None:
-    """ETMS message, check destination"""
-    if "dest" in data and "id" in data:
-        global dest_history
-
-        dest = data.get("dest")
-        if dest == "":
-            return
-
-        flight = data.get("id")
-        if flight == "":
-            return
-
-        if flight in dest_history:
-            orig_dest = dest_history.get(flight)
-            if orig_dest != "":
-                if orig_dest != dest:
-                    data["diverted"] = 1
-
-        dest_history[flight] = dest
-
-    return
 
 def process_extended_flight_info_message(data: dict) -> None:
     """extendedFlightInfo message type"""
@@ -516,6 +488,38 @@ def process_keepalive_message(data: dict) -> None:
     """Keepalive message type"""
     behind = datetime.now(tz=UTC) - datetime.fromtimestamp(int(data["pitr"]), tz=UTC)
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
+
+
+def clear_dest_history(flight) -> None:
+    """Remove id from dest_history"""
+    global dest_history
+    if flight in dest_history:
+        dest_history.pop(flight)
+    return
+
+
+def check_for_diversions(data: dict) -> None:
+    """ETMS message, check destination"""
+    if "dest" in data and "id" in data:
+        global dest_history
+
+        dest = data.get("dest")
+        if dest == "":
+            return
+
+        flight = data.get("id")
+        if flight == "":
+            return
+
+        if flight in dest_history:
+            orig_dest = dest_history.get(flight)
+            if orig_dest != "":
+                if orig_dest != dest:
+                    data["diverted"] = 1
+
+        dest_history[flight] = dest
+
+    return
 
 
 def disambiguate_altitude(data: dict):
