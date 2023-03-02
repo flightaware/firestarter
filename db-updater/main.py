@@ -370,6 +370,7 @@ def chunk(values: Iterable, chunk_size: Optional[int]) -> Iterator:
 
 def add_to_cache(data: dict) -> None:
     """add entry to the cache"""
+    check_for_new_destination(data)
     converted = convert_msg_fields(data)
     with cache_lock:
         cache.add(converted)
@@ -521,6 +522,22 @@ def check_for_diversions(data: dict) -> None:
 
     return
 
+def check_for_new_destination(data: dict) -> None:
+    """Look for a new destination that hasn't been seen by an ETMS message yet"""
+    if "dest" in data and "id" in data:
+        global dest_history
+
+        flight = data.get("id")
+        if flight == "" or flight in dest_history:
+            return
+
+        dest = data.get("dest")
+        if dest == "":
+            return
+
+        dest_history[flight] = dest
+
+    return
 
 def disambiguate_altitude(data: dict):
     """Replaces the alt field in the passed dict with an unambiguous field name"""
