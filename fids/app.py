@@ -48,6 +48,15 @@ app = Flask(__name__)
 UTC = timezone.utc
 
 
+def _get_ground_positions(flight_id: str) -> Iterable:
+    return (
+        positions_engine.execute(
+            positions.select().where(and_(positions.c.id == flight_id, positions.c.air_ground == "G")).order_by(positions.c.time.desc())
+        )
+        or []
+    )
+
+
 def _get_positions(flight_id: str) -> Iterable:
     return (
         positions_engine.execute(
@@ -55,6 +64,15 @@ def _get_positions(flight_id: str) -> Iterable:
         )
         or []
     )
+
+
+@app.route("/ground_positions/<flight_id>")
+def get_ground_positions(flight_id: str) -> Response:
+    """Get ground positions for a specific flight_id"""
+    result = _get_ground_positions(flight_id)
+    if not result:
+        abort(404)
+    return jsonify([dict(e) for e in result])
 
 
 @app.route("/positions/<flight_id>")
@@ -240,18 +258,38 @@ def get_map(flight_id: str) -> bytes:
     positions = list(_get_positions(flight_id))
     if not positions:
         abort(404)
+
+    # Do ground positions
+    ground_positions = list(_get_ground_positions(flight_id))
+    do_gp = True
+    if not ground_positions:
+        do_gp = False
     bearing = 0
     if len(positions) > 1:
-        coord1 = (float(positions[1].latitude), float(positions[1].longitude))
-        coord2 = (float(positions[0].latitude), float(positions[0].longitude))
+        if do_gp:
+            result = min(ground_positions[:2], positions[:2], key=lambda x: x[0].time)
+            # result = ground_positions[:2]
+        else:
+            result = positions[:2]
+
+        coord1 = (float(result[1].latitude), float(result[1].longitude))
+        coord2 = (float(result[0].latitude), float(result[0].longitude))
         bearing = trig.get_cardinal_for_angle(trig.get_bearing_degrees(coord1, coord2))
+    else:
+        result = positions
     coords = "|".join(f"{pos.latitude},{pos.longitude}" for pos in positions)
+    gp_coords = "|".join(f"{pos.latitude},{pos.longitude}" for pos in ground_positions)
 
     google_maps_url = "https://maps.googleapis.com/maps/api/staticmap"
     google_maps_params = {
         "size": "640x400",
-        "markers": f"anchor:center|icon:https://github.com/flightaware/fids_frontend/raw/master/images/aircraft_{bearing}.png|{positions[0].latitude},{positions[0].longitude}",
-        "path": f"color:0x0000ff|weight:5|{coords}",
+        "markers": [
+            f"anchor:center|icon:https://github.com/flightaware/fids_frontend/raw/master/images/aircraft_{bearing}.png|{result[0].latitude},{result[0].longitude}",
+        ],
+        "path": [
+            f"color:0x0000ff|weight:5|{coords}",
+            f"color:0xff0000|weight:5|{gp_coords}" if gp_coords else "",
+            ],
         "key": google_maps_api_key,
     }
     response = requests.get(google_maps_url, google_maps_params)

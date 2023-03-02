@@ -144,8 +144,11 @@ elif TABLE == "positions":
         sa.Column("wind_direction", sa.Integer, key="wind_dir"),
         sa.Column("wind_quality", sa.Integer),
         sa.Column("wind_speed", sa.Integer),
+        # New columns from ground_positions
+        sa.Column("air_ground", sa.String),
+        sa.Column("airport", sa.String),
     )
-    VALID_EVENTS = {"position"}
+    VALID_EVENTS = {"position", "ground_position"}
 
 engine_args: dict = {}
 db_url: str = os.environ["DB_URL"]
@@ -480,6 +483,11 @@ def process_keepalive_message(data: dict) -> None:
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
 
 
+def process_ground_position_message(data: dict) -> None:
+    """Groundposition message type"""
+    return add_to_cache(data)
+
+
 def disambiguate_altitude(data: dict):
     """Replaces the alt field in the passed dict with an unambiguous field name"""
 
@@ -534,6 +542,7 @@ def main():
         "flightplan": process_flightplan_message,
         "keepalive": process_keepalive_message,
         "position": process_position_message,
+        "ground_position": process_ground_position_message,
     }
 
     consumer = None
