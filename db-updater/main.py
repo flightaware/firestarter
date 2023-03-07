@@ -86,7 +86,7 @@ if TABLE == "flights":
         sa.Column("predicted_off", TIMESTAMP_TZ()),
         sa.Column("predicted_on", TIMESTAMP_TZ()),
         sa.Column("predicted_in", TIMESTAMP_TZ()),
-        sa.Column("diverted", sa.Integer),
+        sa.Column("diverted", sa.Boolean),
     )
     VALID_EVENTS = {"arrival", "cancellation", "departure", "flightplan", "onblock", "offblock", "extendedFlightInfo", "flifo"}
 elif TABLE == "positions":
@@ -516,7 +516,7 @@ def check_for_diversions(data: dict) -> None:
             orig_dest = dest_history.get(flight)
             if orig_dest != "":
                 if orig_dest != dest:
-                    data["diverted"] = 1
+                    data["diverted"] = True
 
         dest_history[flight] = dest
 
