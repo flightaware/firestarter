@@ -60,6 +60,11 @@ def parse_args() -> ap.Namespace:
         "--s3-bucket", default=os.getenv("S3_BUCKET", ""), help="S3 bucket to write files into"
     )
     parser.add_argument(
+        "--s3-bucket-folder",
+        default=os.getenv("S3_BUCKET_FOLDER", ""),
+        help="S3 folder to use as prefix",
+    )
+    parser.add_argument(
         "--asyncio-queue-max-size",
         default=int(os.getenv("ASYNCIO_QUEUE_MAX_SIZE", "0")),
         help="Maximum size of the asyncio Queues used",
@@ -236,6 +241,14 @@ class S3FileBatcher:
         account more voluminous message types"""
         return self._current_batch_bytes >= self.bytes_per_file
 
+    @property
+    def folder_prefix(self) -> str:
+        """S3 bucket folder prefix to add to front of key"""
+        if not self.args.s3_bucket_folder:
+            return ""
+
+        return f"{self.args.s3_bucket_folder}/"
+
     def record_pitr(self, record: str) -> int:
         """Return the PITR for a Firehose message"""
         return int(json.loads(record)["pitr"])
@@ -295,8 +308,8 @@ class S3FileBatcher:
 
     def _s3_bucket_folder(self) -> str:
         """YYYY/MM/DD folder name to write batch of messages into"""
-        date_format = datetime.now().strftime("%Y/%m/%d")
-        return f"{self.message_type}/{date_format}"
+        date_format = datetime.now().strftime("year=%Y/month=%m/day=%d")
+        return f"{self.folder_prefix}{self.message_type}/{date_format}"
 
     def _s3_file_extension(self) -> str:
         """File extension to use for uploads to S3"""
@@ -470,7 +483,8 @@ if __name__ == "__main__":
         f"Each {'non-common-message-type ' if ARGS.common_message_types else ''}"
         f"file in S3 will have {batch_logging_message(ARGS)} "
         f"and will be compressed with {ARGS.compression_type} "
-        f"using a batch strategy of {ARGS.batch_strategy} in bucket {ARGS.s3_bucket}"
+        f"using a batch strategy of {ARGS.batch_strategy} in bucket {ARGS.s3_bucket} "
+        f"with an S3 folder prefix of {ARGS.s3_bucket_folder}"
     )
 
     if ARGS.common_message_types:

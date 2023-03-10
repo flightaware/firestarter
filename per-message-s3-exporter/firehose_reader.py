@@ -122,6 +122,7 @@ class FirehoseConfig:
         pitr_map = pitr_map_from_file(init_time)
         if pitr_map:
             min_pitr = min(pitr_map.values())
+            logging.info(f"Based on PITR map {pitr_map}")
             logging.info(f"Using {min_pitr} ({format_epoch(min_pitr)}) as starting PITR value")
             init_time = f"pitr {min_pitr}"
 

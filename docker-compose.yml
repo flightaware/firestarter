@@ -425,6 +425,8 @@ services:
 
       # S3 bucket to write data into
       - S3_BUCKET=${S3_BUCKET:?S3_BUCKET variable must be set}
+      # Bucket folder prefix (optional)
+      - S3_BUCKET_FOLDER
       # Firehose account username
       - FH_USERNAME=${FH_USERNAME:?FH_USERNAME variable must be set}
       # Firehose account key
@@ -452,6 +454,8 @@ services:
       - COMPRESSION_TYPE
       # Log level. Can be debug, info, warning, error, or critical
       - LOG_LEVEL
+      # AWS profile from credentials file
+      - AWS_PROFILE
 
       # OPTIONAL environment variables
       # Firehose URL, defaults to firehose-test.flightaware.com.
