@@ -501,22 +501,15 @@ def clear_dest_history(flight) -> None:
 
 def check_for_diversions(data: dict) -> None:
     """ETMS message, check destination"""
-    if "dest" in data and "id" in data:
-        global dest_history
+    global dest_history
 
-        dest = data.get("dest")
-        if dest == "":
-            return
+    dest = data.get("dest")
+    flight = data.get("id")
+    orig_dest = dest_history.get(flight)
 
-        flight = data.get("id")
-        if flight == "":
-            return
-
-        if flight in dest_history:
-            orig_dest = dest_history.get(flight)
-            if orig_dest != "":
-                if orig_dest != dest:
-                    data["diverted"] = True
+    if dest and flight:
+        if orig_dest and orig_dest != dest:
+            data["diverted"] = True
 
         dest_history[flight] = dest
 
