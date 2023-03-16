@@ -438,7 +438,7 @@ def process_offblock_message(data: dict) -> None:
 def process_onblock_message(data: dict) -> None:
     """Onblock message type"""
     if "id" in data:
-        clear_dest_history(data.get("id"))
+        clear_dest_history(data["id"])
     data["actual_in"] = data["clock"]
     return add_to_cache(data)
 
