@@ -517,17 +517,11 @@ def check_for_diversions(data: dict) -> None:
 
 def check_for_new_destination(data: dict) -> None:
     """Look for a new destination that hasn't been seen by an ETMS message yet"""
-    if "dest" in data and "id" in data:
-        global dest_history
+    global dest_history
+    dest = data.get("dest")
+    flight = data.get("id")
 
-        flight = data.get("id")
-        if flight == "" or flight in dest_history:
-            return
-
-        dest = data.get("dest")
-        if dest == "":
-            return
-
+    if dest and flight and flight not in dest_history:
         dest_history[flight] = dest
 
     return
