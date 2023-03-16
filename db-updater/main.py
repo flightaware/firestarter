@@ -413,7 +413,7 @@ def process_unknown_message(data: dict) -> None:
 def process_arrival_message(data: dict) -> None:
     """Arrival message type"""
     if "id" in data:
-        clear_dest_history(data.get("id"))
+        clear_dest_history(data["id"])
     return add_to_cache(data)
 
 
