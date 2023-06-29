@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from signal import Signals, SIGINT, SIGTERM
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import aiofiles
 import attr
@@ -249,25 +249,31 @@ class S3FileBatcher:
 
         return f"{self.args.s3_bucket_folder}/"
 
-    def record_pitr(self, record: str) -> int:
+    def record_pitr(self, record: Optional[str]) -> int:
         """Return the PITR for a Firehose message"""
+        if record is None:
+            record = self._current_batch[-1]
         return int(json.loads(record)["pitr"])
 
-    async def ingest_record(self, record: str):
+    async def ingest_record(self, record: Optional[str]):
         """Ingest a record from Firehose, adding it to the current batch and
         writing a file to the S3 writer queue if necessary
         """
-        if not self._current_batch:
-            self._start_pitr = self.record_pitr(record)
-            self._timer.start()
+        # An empty line is a signal that we need to shutdown
+        shutdown = record is None
 
         # Even though we might exceed the max bytes, that's okay since it's
         # only a rough threshold that we strive to maintain here and the number
         # of records is more strictly adhered to
-        self._current_batch.append(record)
-        self._current_batch_bytes += len(record)
+        if not shutdown:
+            if not self._current_batch:
+                self._start_pitr = self.record_pitr(record)
+                self._timer.start()
 
-        if self.should_write_batch_to_file():
+            self._current_batch.append(record)
+            self._current_batch_bytes += len(record)
+
+        if (shutdown and self.batch_length > 0) or self.should_write_batch_to_file():
             self._end_pitr = self.record_pitr(record)
             await self.enqueue_batch_contents()
 
@@ -276,6 +282,11 @@ class S3FileBatcher:
 
             self._current_batch = []
             self._current_batch_bytes = 0
+
+        # Propagate shutdown signal
+        if shutdown:
+            logging.info(f"Shutting down {self.message_type} queue: sending signal to S3 writer")
+            await self.s3_writer_queue.put(None)
 
     def should_write_batch_to_file(self) -> bool:
         """Whether the current batch needs to be written to an S3 file
@@ -291,6 +302,10 @@ class S3FileBatcher:
 
     async def enqueue_batch_contents(self):
         """Write the current batch of records to the S3 writer's queue"""
+        if self.batch_length == 0:
+            logging.warning(f"Current batch for {self.message_type} is empty, skipping")
+            return
+
         filename = self.batch_filename()
 
         file_contents = b"".join(self._current_batch)
@@ -304,6 +319,7 @@ class S3FileBatcher:
             end_pitr=self._end_pitr,
         )
 
+        logging.info(f"Writing a batch to the S3 writer for {self.message_type}")
         await self.s3_writer_queue.put(s3_object)
 
     def _s3_bucket_folder(self) -> str:
@@ -344,9 +360,14 @@ async def build_batch_of_records_from_firehose(
     while True:
         # Use a "blocking" await on the queue with Firehose messages which will
         # wait indefinitely until data shows up in the queue
-        firehose_message = await firehose_queue.get()
+        firehose_message: Optional[str] = await firehose_queue.get()
+
         await batcher.ingest_record(firehose_message)
         firehose_queue.task_done()
+
+        # We've reached the end of the PITR range and need to shutdown
+        if firehose_message is None:
+            break
 
 
 async def load_pitr_map(pitr_map_path: Path) -> Dict[str, int]:
@@ -384,8 +405,19 @@ async def write_files_to_s3(
     pitr_map: Dict[str, int] = await load_pitr_map(args.pitr_map)
     pitr_map = {message_type: int(pitr) for message_type, pitr in pitr_map.items()}
 
-    while True:
-        s3_write_object: S3WriteObject = await s3_queue.get()
+    # Keep track of how many shutdown signals we receive for the case where
+    # we're only ingesting a range of values and not processing files
+    # indefinitely
+    total_shutdown_signals = len(FIREHOSE_MESSAGE_TYPES)
+    shutdown_signals_recvd = 0
+
+    while shutdown_signals_recvd < total_shutdown_signals:
+        s3_write_object: Optional[S3WriteObject] = await s3_queue.get()
+
+        # Check for a shutdown signal
+        if s3_write_object is None:
+            shutdown_signals_recvd += 1
+            continue
 
         # Get some timing stats on how long it takes to write to S3
         timer = Timer(
@@ -451,7 +483,7 @@ async def main(args: ap.Namespace):
     # Use a single S3 file writer for all message types
     tasks.append(write_files_to_s3(args, executor, s3_writer_queue))
 
-    # Run all the tasks in the event loop
+    # Run all the tasks in the event loop to completion
     await asyncio.gather(*tasks, return_exceptions=False)
 
 

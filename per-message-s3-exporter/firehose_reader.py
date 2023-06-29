@@ -115,19 +115,36 @@ class FirehoseConfig:
         keepalive = int(os.environ.get("KEEPALIVE", "60"))
         keepalive_stale_pitrs = int(os.environ.get("KEEPALIVE_STALE_PITRS", "5"))
         init_time = os.environ.get("INIT_CMD_TIME", "live")
+        init_time_split = init_time.split()
 
-        if init_time.split()[0] not in ["live", "pitr"]:
-            raise ValueError('$INIT_CMD_TIME value is invalid, should be "live" or "pitr <pitr>"')
+        if init_time_split[0] not in ("live", "pitr", "range"):
+            raise ValueError(
+                '$INIT_CMD_TIME value is invalid, should be "live", '
+                '"pitr <pitr>" or "range <start> <end>"'
+            )
 
         pitr_map = pitr_map_from_file(init_time)
         if pitr_map:
             min_pitr = min(pitr_map.values())
             logging.info(f"Based on PITR map {pitr_map}")
             logging.info(f"Using {min_pitr} ({format_epoch(min_pitr)}) as starting PITR value")
-            init_time = f"pitr {min_pitr}"
+
+            if "pitr" in init_time:
+                init_time = f"pitr {min_pitr}"
+            elif "range" in init_time:
+                init_time_split[1] = f"{min_pitr}"
+                init_time = " ".join(init_time_split)
 
         init_args = os.environ.get("INIT_CMD_ARGS", "")
-        for command in ["live", "pitr", "compression", "keepalive", "username", "password"]:
+        for command in [
+            "live",
+            "pitr",
+            "range",
+            "compression",
+            "keepalive",
+            "username",
+            "password",
+        ]:
             if command in init_args.split():
                 raise ValueError(
                     f'$INIT_CMD_ARGS should not contain the "{command}" command. '
@@ -287,6 +304,13 @@ class AsyncFirehoseReader:
         """How many Firehose read errors before stopping"""
         return int(os.environ.get("CONNECTION_ERROR_LIMIT", "3"))
 
+    async def _shutdown(self):
+        """When a range of PITRs is requested, we send a special shutdown
+        message to every queue to end cleanly"""
+        logging.info("Initiating shutdown procedure: propagating signal to per-message queues")
+        for queue in self.message_queues.values():
+            await queue.put(None)
+
     async def read_firehose(self):
         """Read Firehose until a threshold number of errors occurs"""
         await self._stats.update_stats(None, 0)
@@ -296,11 +320,23 @@ class AsyncFirehoseReader:
         errors = 0
 
         time_mode = self.config.init_time
+        reached_the_end = False
 
         while True:
             pitr = await self._read_until_error(time_mode)
             if pitr:
-                time_mode = f"pitr {pitr}"
+                time_mode_split = time_mode.split()
+                if time_mode_split[0] in ("live", "pitr"):
+                    time_mode = f"pitr {pitr}"
+                else:
+                    if pitr >= int(time_mode_split[-1]):
+                        logging.info("Reached the end of the range")
+                        reached_the_end = True
+                        break
+
+                    time_mode_split[1] = f"{pitr}"
+                    time_mode = " ".join(time_mode_split)
+
                 logging.info(f'Reconnecting with "{time_mode}"')
                 errors = 0
             elif errors < error_limit - 1:
@@ -318,6 +354,9 @@ class AsyncFirehoseReader:
         logging.info("Dumping stats one last time...")
         self._stats.finish()
         await asyncio.wait_for(stats_task, self.stats_period)
+
+        if reached_the_end:
+            return await self._shutdown()
 
         raise ReadFirehoseErrorThreshold
 
@@ -361,6 +400,10 @@ class AsyncFirehoseReader:
 
         time_mode may be either the string "live" or a pitr string that looks like
         "pitr <pitr>" where <pitr> is a value previously returned by this function
+        or a pitr string that looks like "range <start> <end>". In the case of
+        a range, if we get to the end value we stop cleanly and shutdown,
+        otherwise we can resume from a start value previously returned by this
+        function.
         """
 
         context = ssl.create_default_context()
