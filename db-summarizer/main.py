@@ -91,6 +91,7 @@ table = sa.Table(
     sa.Column("predicted_off", sa.Integer),
     sa.Column("predicted_on", sa.Integer),
     sa.Column("predicted_in", sa.Integer),
+    sa.Column("diverted", sa.Boolean),
 )
 VALID_EVENTS = {
     "arrival",
@@ -132,6 +133,7 @@ finished = threading.Event()
 cache_lock = threading.Lock()
 SQLITE_VAR_LIMIT = None
 
+dest_history = dict()
 
 class Cache(ABC):
     """A cache for accumulating flight or position information which can be flushed as necessary."""
@@ -470,6 +472,8 @@ def process_unknown_message(data: dict, _: int) -> None:
 
 def process_arrival_message(data: dict, offset: int) -> None:
     """Arrival message type"""
+    if "id" in data:
+        clear_dest_history(data["id"])
     return add_to_cache(data, offset)
 
 
@@ -493,12 +497,16 @@ def process_offblock_message(data: dict, offset: int) -> None:
 
 def process_onblock_message(data: dict, offset: int) -> None:
     """Onblock message type"""
+    if "id" in data:
+        clear_dest_history(data["id"])
     data["actual_in"] = data["clock"]
     return add_to_cache(data, offset)
 
 
 def process_flifo_message(data: dict, offset: int) -> None:
     """flifo message type"""
+    # flightplan and flifo messages may contain a new dest indicating a diversion, flag it if so
+    check_for_diversions(data)
     # flifo messages try to help us with saner names, but we already convert
     # field names at the sqlalchemy level, so we actually need to convert the
     # nice names to ugly names so they can be converted again later...
@@ -526,6 +534,8 @@ def process_extended_flight_info_message(data: dict, offset: int) -> None:
 
 def process_flightplan_message(data: dict, offset: int) -> None:
     """Flightplan message type"""
+    # flightplan and flifo messages may contain a new dest indicating a diversion, flag it if so
+    check_for_diversions(data)
     disambiguate_altitude(data)
     return add_to_cache(data, offset)
 
@@ -540,6 +550,40 @@ def process_keepalive_message(data: dict, _: int) -> None:
     behind = datetime.now(tz=UTC) - datetime.fromtimestamp(int(data["pitr"]), tz=UTC)
     print(f'Based on keepalive["pitr"], we are {behind} behind realtime')
 
+def clear_dest_history(flight) -> None:
+    """Remove id from dest_history"""
+    global dest_history
+    if flight in dest_history:
+        dest_history.pop(flight)
+    return
+
+
+def check_for_diversions(data: dict) -> None:
+    """ETMS message, check destination"""
+    global dest_history
+
+    dest = data.get("dest")
+    flight = data.get("id")
+    orig_dest = dest_history.get(flight)
+
+    if dest and flight:
+        if orig_dest and orig_dest != dest:
+            data["diverted"] = True
+
+        dest_history[flight] = dest
+
+    return
+
+def check_for_new_destination(data: dict) -> None:
+    """Look for a new destination that hasn't been seen by an ETMS message yet"""
+    global dest_history
+    dest = data.get("dest")
+    flight = data.get("id")
+
+    if dest and flight and flight not in dest_history:
+        dest_history[flight] = dest
+
+    return
 
 def disambiguate_altitude(data: dict):
     """Replaces the alt field in the passed dict with an unambiguous field name"""
