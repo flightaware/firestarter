@@ -167,6 +167,7 @@ services:
       - TABLE=flights
     volumes:
       - data:/home/firestarter/app/db
+
     logging:
       driver: "json-file"
       options:
@@ -199,7 +200,7 @@ services:
       # Topic to produce summarized flight data to
       - PRODUCER_TOPIC_NAME=flights-summaries
       # Size of a batch of summarized flights when producing the PRODUCER_TOPIC
-      - BATCH_SIZE=20000
+      - BATCH_SIZE=1000
     volumes:
       # The table is always flights
       - data:/home/firestarter/app/db
@@ -372,10 +373,10 @@ services:
 
       # OPTIONAL environment variables
       # Bucket folder: keep blank to avoid writing files to a folder
-      - S3_BUCKET_FOLDER=summary
+      - S3_BUCKET_FOLDER
       # Kafka brokers (defaults to kafka:9092)
       - KAFKA_BROKERS
-      # Kafka topic (defaults to events)
+      # Kafka topic (defaults to flights-summaries)
       - KAFKA_TOPIC=flights-summaries
       # Max size of the asyncio queues used by the coroutines
       # Defaults to 0 which means there is not max size
@@ -385,12 +386,12 @@ services:
       - BATCH_STRATEGY=both
       # Max records per file written to S3
       # Defaults to 15k
-      - RECORDS_PER_FILE=100000
+      - RECORDS_PER_FILE
       # Max byes per file written to S3 
       # Defaults to 10MB
       # Once RECORDS_PER_FILE or BYTES_PER_FILE is reached, a file
       # is written to S3
-      - BYTES_PER_FILE=32MB
+      - BYTES_PER_FILE
       # Compression type. Can be none or bzip. Defaults to none
       - COMPRESSION_TYPE=bzip
       # Log level. Can be debug, info, warning, error, or critical
@@ -404,8 +405,6 @@ services:
       # Map the docker-compose user's aws home directory
       # into the container although AWS credentials can also
       # be provided in environment variables
-      # This is turned off by default, but comment out to provide
-      # credentials this way rather than through environment variables
       - /data/.aws:/home/firestarter/.aws:ro
     logging:
       driver: "journald"
