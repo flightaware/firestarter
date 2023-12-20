@@ -4,6 +4,7 @@ LABEL org.opencontainers.image.source=https://github.com/flightaware/firestarter
 
 RUN apt-get update && apt-get install -y build-essential librdkafka-dev
 RUN id -u firestarter || useradd -u 8081 firestarter -c "FIRESTARTER User" -m -s /bin/sh
+RUN chown firestarter:firestarter /home/firestarter
 WORKDIR /home/firestarter
 
 COPY --chown=firestarter Makefile.inc .
