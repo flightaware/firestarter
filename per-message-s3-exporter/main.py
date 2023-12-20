@@ -329,10 +329,11 @@ class S3FileBatcher:
 
     def _s3_file_extension(self) -> str:
         """File extension to use for uploads to S3"""
+        base_extension = ".json"
         if self.compression_type == "none":
-            return ""
+            return base_extension
 
-        return ".bz2"
+        return f"{base_extension}.bz2"
 
     def batch_filename(self) -> str:
         """Filename to use in S3 for writing out the Firehose messages"""
